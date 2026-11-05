@@ -240,9 +240,9 @@ function render(){
 
   if (state.kind === 'word'){
     const words = mine.words || [];
-    st.textContent = open ? (words.length >= 3 ? '단어 3개를 모두 보냈어요. 고마워요!' : `단어를 보내 주세요 (${words.length}/3)`)
+    st.textContent = open ? (words.length ? `단어 ${words.length}개를 보냈어요. 더 보내도 돼요.` : '단어를 보내 주세요')
                           : '지금은 응답을 받지 않아요. 강사님 안내를 기다려 주세요.';
-    if (open && words.length < 3){
+    if (open){
       const f = document.createElement('form'); f.className = 'send';
       f.innerHTML = '<input maxlength="12" placeholder="12자 이내 단어" aria-label="단어 입력" autocomplete="off" enterkeyhint="send"><button>보내기</button>';
       const inp = f.querySelector('input'), btn = f.querySelector('button');

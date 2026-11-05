@@ -284,7 +284,7 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
 
 <div class="lock" id="lock" role="dialog" aria-label="강사 로그인">
   <img src="girin.png" alt="" aria-hidden="true">
-  <h2 id="lockTitle">강사 화면이에요</h2>
+  <h2 id="lockTitle">선생님 화면이에요</h2>
   <p id="lockMsg"></p>
   <button id="loginBtn" hidden>구글 계정으로 로그인</button>
 </div>
@@ -419,7 +419,7 @@ S.onAuth(u => {
   } else {
     wrongAccount = false;
     $('#logoutBtn').hidden = true;
-    showLock('강사 화면이에요', location.protocol === 'file:' ? '강사 화면은 GitHub Pages 주소로 열어 주세요' : '', '구글 계정으로 로그인');
+    showLock('선생님 화면이에요', location.protocol === 'file:' ? '강사 화면은 GitHub Pages 주소로 열어 주세요' : '', '구글 계정으로 로그인');
   }
 });
 $('#loginBtn').onclick = async () => {
@@ -470,7 +470,7 @@ function watchResponses(){
 const curIndex = () => state ? questions.findIndex(q => q.id === state.qid) : -1;
 function goTo(i){
   const q = questions[i]; if (!q) return;
-  S.setState({ qid:q.id, kind:q.kind, text:q.text, options:q.options || [], optImages:q.optImages || [], multi:!!q.multi, url:q.url || '', desc:q.desc || '', round:q.round || 0, open:false, hidden:[] }).catch(onErr);
+  S.setState({ qid:q.id, kind:q.kind, text:q.text, options:q.options || [], optImages:q.optImages || [], multi:!!q.multi, url:q.url || '', desc:q.desc || '', round:q.round || 0, open:true, hidden:[] }).catch(onErr);
 }
 function step(d){ const i = curIndex(); goTo(i < 0 ? 0 : Math.min(Math.max(i + d, 0), questions.length - 1)); }
 const isLink = () => !!(state && state.qid && state.kind === 'link');
@@ -840,7 +840,7 @@ function renderEditor(){
       <div class="orows"></div>
       <div class="linkf"><input class="u" type="url" inputmode="url" placeholder="https://" aria-label="주소"><input class="dsc" placeholder="설명 한 줄 (선택)" aria-label="설명" maxlength="120"></div>
       <label class="multi"><input type="checkbox" class="m">복수 응답 허용</label>
-      <p class="hint">${q.kind === 'choice' ? '보기는 한 줄에 하나씩, 2~8개' : q.kind === 'memo' ? '참여자 한 명이 200자 이내 메모를 3장까지 붙일 수 있어요' : q.kind === 'link' ? '' : '참여자 한 명이 12자 이내 단어를 3개까지 보낼 수 있어요'}</p>
+      <p class="hint">${q.kind === 'choice' ? '보기는 한 줄에 하나씩, 2~8개' : q.kind === 'memo' ? '참여자 한 명이 200자 이내 메모를 3장까지 붙일 수 있어요' : q.kind === 'link' ? '' : '참여자 한 명이 12자 이내 단어를 여러 개 보낼 수 있어요'}</p>
       <p class="warn" hidden></p>`;
     const sel = it.querySelector('select'), t = it.querySelector('.t'), box = it.querySelector('.orows');
     sel.value = q.kind; t.value = q.text;
@@ -946,7 +946,7 @@ $('#edSave').onclick = async () => {
     ]);
     const cur = state && draft.find(q => q.id === state.qid);
     if (cur) await S.setState({ kind:cur.kind, text:cur.text, options:cur.options, optImages:cur.optImages, multi:cur.multi, url:cur.url, desc:cur.desc });
-    else if (draft.length) await S.setState({ qid:draft[0].id, kind:draft[0].kind, text:draft[0].text, options:draft[0].options, optImages:draft[0].optImages, multi:draft[0].multi, url:draft[0].url, desc:draft[0].desc, round:draft[0].round || 0, open:false, hidden:[] });
+    else if (draft.length) await S.setState({ qid:draft[0].id, kind:draft[0].kind, text:draft[0].text, options:draft[0].options, optImages:draft[0].optImages, multi:draft[0].multi, url:draft[0].url, desc:draft[0].desc, round:draft[0].round || 0, open:true, hidden:[] });
     else await S.setState({ qid:null, open:false });
     $('#editor').close();
   } catch (e){ onErr(e); }
