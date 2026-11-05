@@ -70,8 +70,8 @@
 }
 
 :root{
-  --leaf:#234F3C; --paper:#F3F6EF; --mist:#DDE7DA; --ochre:#E3A33A; --spot:#7A4E25;
-  --ink:#1D2722; --muted:#5E6B63; --alert:#B5482F;
+  --leaf:#7A5530; --paper:#FFF7D6; --mist:#F3E3A0; --ochre:#F4C74F; --spot:#A0703A;
+  --ink:#3B2E1E; --muted:#7D6B4F; --alert:#B5482F;
   --font:'Paperozi','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
 }
 *{box-sizing:border-box}
@@ -89,9 +89,9 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-
 .status.open{color:var(--leaf);font-weight:600}
 .opts{display:flex;flex-direction:column;gap:12px}
 .opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:16px 16px;border-radius:14px;border:2px solid var(--mist);
-  background:#fff;color:var(--ink);font-size:18px;font-weight:600;line-height:1.35;word-break:keep-all;cursor:pointer;transition:border-color .15s,background .15s}
+  background:#FFFDF3;color:var(--ink);font-size:18px;font-weight:600;line-height:1.35;word-break:keep-all;cursor:pointer;transition:border-color .15s,background .15s}
 .opt .dot{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--mist);background:#fff}
-.opt.on{border-color:var(--leaf);background:#fff7e8}
+.opt.on{border-color:var(--leaf);background:#FFEFB0}
 .opt.on .dot{border-color:var(--spot);background:var(--ochre);
   background-image:radial-gradient(circle at 35% 35%, var(--spot) 22%, transparent 26%),radial-gradient(circle at 68% 66%, var(--spot) 18%, transparent 22%)}
 .opt:disabled{cursor:default;opacity:.55}
