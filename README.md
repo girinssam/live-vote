@@ -18,13 +18,13 @@
 3. 프로젝트 설정 > 내 앱 > 웹 앱 추가 → firebaseConfig 값을 `config.js`에 붙여 넣기
 4. 다섯 파일을 GitHub 저장소(예: live-vote)에 올리고 GitHub Pages 켜기
 5. `config.js`의 STUDENT_URL에 `https://girinssam.github.io/live-vote/` 입력 후 다시 올리기
-6. 강의 때 강사 화면은 **반드시 GitHub Pages 주소로 열고 로그인**: `https://girinssam.github.io/live-vote/screen.html`
+6. 강의 때 선생님 화면은 **반드시 GitHub Pages 주소로 열고 로그인**: `https://girinssam.github.io/live-vote/screen.html`
    (`config.js`의 ADMIN_EMAIL 구글 계정으로 로그인해야 질문·화면 상태를 바꿀 수 있음. 내 컴퓨터 파일로 열면 로그인이 안 됨)
 
 ## 강사 로그인
-- 강사 화면(`screen.html`)은 `config.js`의 `ADMIN_EMAIL` 구글 계정으로 로그인해야 열림. 학생 화면은 로그인 없음
+- 선생님 화면(`screen.html`)은 `config.js`의 `ADMIN_EMAIL` 구글 계정으로 로그인해야 열림. 학생 화면은 로그인 없음
 - Firestore 보안 규칙도 이 계정만 질문(questions)·화면 상태(state)를 쓸 수 있게 막아 둠. 계정을 바꾸면 `firestore.rules`도 함께 바꾸고 다시 배포
 - 연습 모드(apiKey 비어 있음)에서는 로그인 없이 열림
 
-## 단축키 (강사 화면)
+## 단축키 (선생님 화면)
 ← → 질문 이동 · Space 응답 시작/마감 · R 결과 숨기기/보이기 · Q QR 크게 · B 조작 막대 숨기기

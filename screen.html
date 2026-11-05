@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>실시간 소통창 · 강사 화면</title>
+<title>실시간 소통창 · 선생님 화면</title>
 <link rel="icon" href="girin.png">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <style>
@@ -282,7 +282,7 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
 <body>
 <div class="err" id="err" role="alert"></div>
 
-<div class="lock" id="lock" role="dialog" aria-label="강사 로그인">
+<div class="lock" id="lock" role="dialog" aria-label="선생님 로그인">
   <img src="girin.png" alt="" aria-hidden="true">
   <h2 id="lockTitle">선생님 화면이에요</h2>
   <p id="lockMsg"></p>
@@ -314,7 +314,7 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
   </aside>
 </section>
 
-<nav class="bar" aria-label="강사 조작">
+<nav class="bar" aria-label="선생님 조작">
   <button id="prev" aria-label="이전 질문">◀ 이전</button>
   <button id="next" aria-label="다음 질문">다음 ▶</button>
   <span class="sep"></span>
@@ -415,11 +415,11 @@ S.onAuth(u => {
   } else if (u){
     wrongAccount = true;
     $('#logoutBtn').hidden = true;
-    showLock('강사 계정이 아니에요', u.email, '다른 계정으로 로그인');
+    showLock('선생님 계정이 아니에요', u.email, '다른 계정으로 로그인');
   } else {
     wrongAccount = false;
     $('#logoutBtn').hidden = true;
-    showLock('선생님 화면이에요', location.protocol === 'file:' ? '강사 화면은 GitHub Pages 주소로 열어 주세요' : '', '구글 계정으로 로그인');
+    showLock('선생님 화면이에요', location.protocol === 'file:' ? '선생님 화면은 GitHub Pages 주소로 열어 주세요' : '', '구글 계정으로 로그인');
   }
 });
 $('#loginBtn').onclick = async () => {
