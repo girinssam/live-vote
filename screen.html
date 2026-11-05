@@ -180,12 +180,24 @@ dialog::backdrop{background:rgba(59,46,30,.55)}
 .item .multi{display:flex;align-items:center;gap:8px;font-size:15px;cursor:pointer;width:max-content}
 .item .multi[hidden]{display:none}
 .item .multi input{width:18px;height:18px;accent-color:var(--leaf);margin:0}
+.orows{display:flex;flex-direction:column;gap:8px}
+.orows[hidden]{display:none}
+.orow{display:flex;align-items:center;gap:6px}
+.orow .otext{flex:1;min-width:0;font:inherit;font-size:16px;border:1.5px solid var(--mist);border-radius:10px;padding:8px 10px;background:var(--paper);color:var(--ink)}
+.oimg{position:relative;flex:none;width:48px;height:48px;border:1.5px dashed var(--mist);border-radius:10px;background:var(--paper);color:var(--muted);font-size:11px;line-height:1.15;padding:0;display:flex;align-items:center;justify-content:center;text-align:center}
+.oimg.has{border-style:solid;background:#fff}
+.oimg img{width:100%;height:100%;object-fit:contain;border-radius:8px;display:block}
+.oimg .x{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:0;background:var(--ink);color:#fff;font-size:12px;line-height:20px;padding:0;text-align:center}
+.oadd{align-self:flex-start}
+.mini:disabled{opacity:.4;cursor:default}
 .mini{background:transparent;border:1.5px solid var(--mist);border-radius:8px;padding:5px 10px;font-size:14px;color:var(--ink)}
 .mini.del{color:var(--alert);margin-left:auto}
 .ed-foot{display:flex;gap:8px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--mist)}
 .btn{border-radius:10px;padding:9px 16px;font-size:15px;font-weight:600;border:1.5px solid var(--leaf);background:transparent;color:var(--leaf)}
 .btn.primary{background:var(--leaf);color:var(--paper);margin-left:auto}
 .ed-empty{color:var(--muted);text-align:center;padding:24px 0}
+.label.has-img{display:flex;align-items:center;gap:12px}
+.label .limg{flex:none;width:48px;height:48px;object-fit:contain;border-radius:8px}
 
 @media (max-width:900px){
   body{overflow:auto}
@@ -283,6 +295,7 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
 <script>
 const S = window.VoteStore;
 const $ = (s) => document.querySelector(s);
+const isImg = (v) => typeof v === 'string' && v.startsWith('data:image/');
 let questions = [], state = null, responses = [], showResults = true;
 let unsubResp = null, curKey = null, seenWords = new Set(), autoStarted = false, qLoaded = false;
 
@@ -319,7 +332,7 @@ function watchResponses(){
 const curIndex = () => state ? questions.findIndex(q => q.id === state.qid) : -1;
 function goTo(i){
   const q = questions[i]; if (!q) return;
-  S.setState({ qid:q.id, kind:q.kind, text:q.text, options:q.options || [], multi:!!q.multi, round:q.round || 0, open:false }).catch(onErr);
+  S.setState({ qid:q.id, kind:q.kind, text:q.text, options:q.options || [], optImages:q.optImages || [], multi:!!q.multi, round:q.round || 0, open:false }).catch(onErr);
 }
 function step(d){ const i = curIndex(); goTo(i < 0 ? 0 : Math.min(Math.max(i + d, 0), questions.length - 1)); }
 function toggleOpen(){ if (state && state.qid) S.setState({ open: !state.open }).catch(onErr); }
@@ -384,14 +397,20 @@ function renderResults(){
 
 function renderBars(box){
   const opts = state.options || [];
-  const sig = 'bars:' + JSON.stringify(opts);
+  const imgs = Array.isArray(state.optImages) ? state.optImages : [];
+  const sig = 'bars:' + JSON.stringify([opts, imgs]);
   if (box.dataset.sig !== sig){
     box.dataset.sig = sig; box.innerHTML = '';
     const wrap = document.createElement('div'); wrap.className = 'bars';
-    opts.forEach((o) => {
+    opts.forEach((o, i) => {
       const row = document.createElement('div'); row.className = 'row';
       row.innerHTML = '<div class="label"></div><div class="track"><div class="fill"></div></div><div class="val"></div>';
-      row.querySelector('.label').textContent = o;
+      const label = row.querySelector('.label');
+      if (isImg(imgs[i])){
+        const im = document.createElement('img'); im.className = 'limg'; im.alt = ''; im.src = imgs[i];
+        const tx = document.createElement('span'); tx.textContent = o;
+        label.classList.add('has-img'); label.append(im, tx);
+      } else label.textContent = o;
       wrap.appendChild(row);
     });
     const mnote = document.createElement('p'); mnote.className = 'multi-note';
@@ -486,16 +505,68 @@ const SAMPLES = [
 ];
 
 function openEditor(){
-  draft = questions.map(q => ({ ...q, options:[...(q.options || [])], optText:(q.options || []).join('\n') }));
+  draft = questions.map(q => ({ ...q, rows:toRows(q.options, q.optImages) }));
   renderEditor(); $('#editor').showModal();
 }
+function toRows(options = [], images = []){
+  return (options || []).map((t, i) => ({ text:t, img:isImg((images || [])[i]) ? images[i] : '' }));
+}
 function addDraft(kind, text = '', options = []){
-  draft.push({ id:S.newId('q'), kind, text, options, optText:options.join('\n'), multi:false, round:0 });
+  const rows = kind === 'choice' ? (options.length ? toRows(options) : [{ text:'', img:'' }, { text:'', img:'' }]) : [];
+  draft.push({ id:S.newId('q'), kind, text, rows, multi:false, round:0 });
   renderEditor();
   const list = $('#edList'); list.scrollTop = list.scrollHeight;
 }
+
+/* 보기 이미지: 최대 160×160으로 줄여 webp data URL로 (한 장 60KB 이하) */
+const IMG_MAX = 160, IMG_BYTES = 60 * 1024, Q_BYTES = 900 * 1024;
+function loadImage(blob){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(blob), im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); res(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('이미지를 읽지 못했어요')); };
+    im.src = url;
+  });
+}
+async function shrinkImage(blob){
+  const im = await loadImage(blob);
+  const w0 = im.naturalWidth || IMG_MAX, h0 = im.naturalHeight || IMG_MAX;
+  let side = IMG_MAX, q = 0.85, out = '';
+  for (let k = 0; k < 12; k++){
+    const s = Math.min(1, side / Math.max(w0, h0));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w0 * s)); c.height = Math.max(1, Math.round(h0 * s));
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+    out = c.toDataURL('image/webp', q);
+    if (out.length * 0.75 <= IMG_BYTES) break;
+    side = Math.round(side * 0.8); q = Math.max(0.5, q - 0.1);
+  }
+  return out;
+}
+const picker = document.createElement('input');
+picker.type = 'file'; picker.accept = 'image/*'; picker.hidden = true; document.body.appendChild(picker);
+let pickTarget = null;
+picker.onchange = () => { const f = picker.files[0]; picker.value = ''; if (f && pickTarget) setRowImage(pickTarget, f); };
+async function setRowImage(row, blob){
+  try { row.img = await shrinkImage(blob); renderEditor(); }
+  catch (e){ onErr(e); }
+}
+// 보기 글자칸이나 이미지 칸에 초점이 있을 때 Ctrl+V로 이미지 붙여 넣기
+$('#editor').addEventListener('paste', (e) => {
+  const el = document.activeElement && document.activeElement.closest('.orow');
+  if (!el) return;
+  const file = [...(e.clipboardData ? e.clipboardData.items : [])].find(it => it.kind === 'file' && it.type.startsWith('image/'));
+  if (!file) return;
+  e.preventDefault();
+  const q = draft[+el.dataset.q], row = q && q.rows[+el.dataset.r];
+  if (row) setRowImage(row, file.getAsFile());
+});
+
 function renderEditor(){
-  const list = $('#edList'); list.innerHTML = '';
+  const list = $('#edList');
+  const fr = document.activeElement && document.activeElement.closest && document.activeElement.closest('.orow');
+  const focus = fr ? { q:fr.dataset.q, r:fr.dataset.r, img:document.activeElement.classList.contains('oimg') } : null;
+  list.innerHTML = '';
   if (!draft.length){ list.innerHTML = '<p class="ed-empty">아직 질문이 없어요. 아래 버튼으로 질문을 추가해 보세요.</p>'; return; }
   draft.forEach((q, i) => {
     const it = document.createElement('div'); it.className = 'item'; it.dataset.i = i;
@@ -507,24 +578,67 @@ function renderEditor(){
         <button class="mini del">삭제</button>
       </div>
       <textarea class="t" rows="2" placeholder="질문을 입력하세요" aria-label="질문"></textarea>
-      <textarea class="o" rows="4" placeholder="보기를 한 줄에 하나씩 적어 주세요" aria-label="보기"></textarea>
+      <div class="orows"></div>
       <label class="multi"><input type="checkbox" class="m">복수 응답 허용</label>
       <p class="hint">${q.kind === 'choice' ? '보기는 한 줄에 하나씩, 2~8개' : '참여자 한 명이 12자 이내 단어를 3개까지 보낼 수 있어요'}</p>
       <p class="warn" hidden></p>`;
-    const sel = it.querySelector('select'), t = it.querySelector('.t'), o = it.querySelector('.o');
-    sel.value = q.kind; t.value = q.text; o.value = q.optText || '';
-    o.hidden = q.kind !== 'choice';
+    const sel = it.querySelector('select'), t = it.querySelector('.t'), box = it.querySelector('.orows');
+    sel.value = q.kind; t.value = q.text;
+    box.hidden = q.kind !== 'choice';
+    if (q.kind === 'choice') renderRows(q, i, box);
     const m = it.querySelector('.m');
     m.checked = !!q.multi; m.closest('.multi').hidden = q.kind !== 'choice';
     m.onchange = () => { q.multi = m.checked; };
-    sel.onchange = () => { q.kind = sel.value; renderEditor(); };
+    sel.onchange = () => {
+      q.kind = sel.value;
+      if (q.kind === 'choice' && !(q.rows && q.rows.length)) q.rows = [{ text:'', img:'' }, { text:'', img:'' }];
+      renderEditor();
+    };
     t.oninput = () => { q.text = t.value; };
-    o.oninput = () => { q.optText = o.value; };
     it.querySelector('.up').onclick = () => { if (i > 0){ [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; renderEditor(); } };
     it.querySelector('.down').onclick = () => { if (i < draft.length - 1){ [draft[i + 1], draft[i]] = [draft[i], draft[i + 1]]; renderEditor(); } };
     it.querySelector('.del').onclick = () => { if (confirm(`${i + 1}번 질문을 삭제할까요?`)){ draft.splice(i, 1); renderEditor(); } };
     list.appendChild(it);
   });
+  if (focus){
+    const el = list.querySelector(`.orow[data-q="${focus.q}"][data-r="${focus.r}"] ${focus.img ? '.oimg' : '.otext'}`);
+    if (el) el.focus();
+  }
+}
+function renderRows(q, qi, box){
+  q.rows = q.rows || [];
+  q.rows.forEach((row, r) => {
+    const el = document.createElement('div'); el.className = 'orow'; el.dataset.q = qi; el.dataset.r = r;
+    el.innerHTML = `
+      <button type="button" class="oimg" aria-label="${r + 1}번 보기 이미지"></button>
+      <input class="otext" placeholder="보기 ${r + 1}" aria-label="${r + 1}번 보기">
+      <button type="button" class="mini rup" aria-label="보기 위로">▲</button><button type="button" class="mini rdown" aria-label="보기 아래로">▼</button>
+      <button type="button" class="mini rdel">삭제</button>`;
+    const pic = el.querySelector('.oimg'), inp = el.querySelector('.otext');
+    if (isImg(row.img)){
+      pic.classList.add('has');
+      const im = document.createElement('img'); im.alt = ''; im.src = row.img;
+      const x = document.createElement('span'); x.className = 'x'; x.textContent = '×'; x.title = '이미지 빼기';
+      x.onclick = (e) => { e.stopPropagation(); row.img = ''; renderEditor(); };
+      pic.append(im, x);
+    } else pic.textContent = '+ 이미지';
+    pic.onclick = () => { pickTarget = row; picker.click(); };
+    inp.value = row.text || '';
+    inp.oninput = () => { row.text = inp.value; };
+    const up = el.querySelector('.rup'), down = el.querySelector('.rdown'), del = el.querySelector('.rdel');
+    up.disabled = r === 0; down.disabled = r === q.rows.length - 1; del.disabled = q.rows.length <= 2;
+    up.onclick = () => { [q.rows[r - 1], q.rows[r]] = [q.rows[r], q.rows[r - 1]]; renderEditor(); };
+    down.onclick = () => { [q.rows[r + 1], q.rows[r]] = [q.rows[r], q.rows[r + 1]]; renderEditor(); };
+    del.onclick = () => { q.rows.splice(r, 1); renderEditor(); };
+    box.appendChild(el);
+  });
+  const add = document.createElement('button'); add.type = 'button'; add.className = 'mini oadd'; add.textContent = '+ 보기 추가';
+  add.disabled = q.rows.length >= 8;
+  add.onclick = () => {
+    q.rows.push({ text:'', img:'' }); renderEditor();
+    const ins = $('#edList').querySelectorAll(`.orow[data-q="${qi}"] .otext`); if (ins.length) ins[ins.length - 1].focus();
+  };
+  box.appendChild(add);
 }
 $('#edAddChoice').onclick = () => addDraft('choice');
 $('#edAddWord').onclick = () => addDraft('word');
@@ -535,11 +649,16 @@ $('#edSave').onclick = async () => {
   document.querySelectorAll('#edList .item').forEach((it, i) => {
     const q = draft[i];
     q.text = q.text.trim();
-    q.options = q.kind === 'choice' ? (q.optText || '').split('\n').map(s => s.trim()).filter(Boolean).slice(0, 8) : [];
+    const rows = q.kind === 'choice'
+      ? (q.rows || []).map(r => ({ text:(r.text || '').trim(), img:isImg(r.img) ? r.img : '' })).filter(r => r.text || r.img).slice(0, 8) : [];
+    q.options = rows.map(r => r.text);
+    q.optImages = rows.map(r => r.img);
     q.multi = q.kind === 'choice' && !!q.multi;
     let msg = '';
     if (!q.text) msg = '질문을 입력해 주세요.';
+    else if (rows.some(r => !r.text)) msg = '이미지를 넣은 보기에도 글자를 적어 주세요.';
     else if (q.kind === 'choice' && q.options.length < 2) msg = '보기를 2개 이상 적어 주세요.';
+    else if (JSON.stringify({ text:q.text, options:q.options, optImages:q.optImages }).length > Q_BYTES) msg = '이미지가 너무 커요';
     it.classList.toggle('bad', !!msg);
     const w = it.querySelector('.warn'); w.textContent = msg; w.hidden = !msg;
     if (msg) ok = false;
@@ -548,12 +667,12 @@ $('#edSave').onclick = async () => {
   try {
     const keep = new Set(draft.map(q => q.id));
     await Promise.all([
-      ...draft.map((q, i) => S.saveQuestion({ id:q.id, kind:q.kind, text:q.text, options:q.options, multi:q.multi, round:q.round || 0, order:i })),
+      ...draft.map((q, i) => S.saveQuestion({ id:q.id, kind:q.kind, text:q.text, options:q.options, optImages:q.optImages, multi:q.multi, round:q.round || 0, order:i })),
       ...questions.filter(q => !keep.has(q.id)).map(q => S.deleteQuestion(q.id))
     ]);
     const cur = state && draft.find(q => q.id === state.qid);
-    if (cur) await S.setState({ kind:cur.kind, text:cur.text, options:cur.options, multi:cur.multi });
-    else if (draft.length) await S.setState({ qid:draft[0].id, kind:draft[0].kind, text:draft[0].text, options:draft[0].options, multi:draft[0].multi, round:draft[0].round || 0, open:false });
+    if (cur) await S.setState({ kind:cur.kind, text:cur.text, options:cur.options, optImages:cur.optImages, multi:cur.multi });
+    else if (draft.length) await S.setState({ qid:draft[0].id, kind:draft[0].kind, text:draft[0].text, options:draft[0].options, optImages:draft[0].optImages, multi:draft[0].multi, round:draft[0].round || 0, open:false });
     else await S.setState({ qid:null, open:false });
     $('#editor').close();
   } catch (e){ onErr(e); }

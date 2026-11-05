@@ -101,6 +101,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-
 .opts{display:flex;flex-direction:column;gap:12px}
 .opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:16px 16px;border-radius:14px;border:2px solid var(--mist);
   background:#FFFDF3;color:var(--ink);font-size:18px;font-weight:600;line-height:1.35;word-break:keep-all;cursor:pointer;transition:border-color .15s,background .15s}
+.opt .oimg{flex:none;width:44px;height:44px;object-fit:contain;border-radius:8px}
 .opt .dot{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--mist);background:#fff}
 .opt.on{border-color:var(--leaf);background:#FFEFB0}
 .opt.on .dot{border-color:var(--spot);background:var(--ochre)}
@@ -156,6 +157,15 @@ const MINE_KEY = 'girinvote_mine';
 const loadMine = () => { try { return JSON.parse(S.local.getItem(MINE_KEY)) || {}; } catch (e){ return {}; } };
 const saveMine = (m) => S.local.setItem(MINE_KEY, JSON.stringify(m));
 
+// 보기 이미지 (data:image/ 로 시작하는 값만, img.src로만 넣음)
+const isImg = (v) => typeof v === "string" && v.startsWith("data:image/");
+function addOptImg(b, i){
+  const v = state && Array.isArray(state.optImages) ? state.optImages[i] : "";
+  if (!isImg(v)) return;
+  const im = document.createElement("img"); im.className = "oimg"; im.alt = ""; im.src = v;
+  b.insertBefore(im, b.lastChild);
+}
+
 let toastT;
 function toast(msg, bad){
   const t = document.getElementById('toast');
@@ -175,7 +185,7 @@ setTimeout(() => {
 function render(){
   const key = S.qkey(state);
   const mine = (loadMine()[key]) || {};
-  const sig = JSON.stringify([key, state && state.open, state && state.text, state && state.options, state && state.kind, state && !!state.multi, mine]);
+  const sig = JSON.stringify([key, state && state.open, state && state.text, state && state.options, state && state.kind, state && !!state.multi, state && state.optImages, mine]);
   if (sig === lastSig) return;          // 입력 중인 글자가 지워지지 않게
   lastSig = sig;
 
@@ -238,7 +248,7 @@ function render(){
       b.disabled = !open;
       b.setAttribute('aria-pressed', on);
       b.innerHTML = '<span class="dot" aria-hidden="true"></span><span></span>';
-      b.lastChild.textContent = o;
+      b.lastChild.textContent = o; addOptImg(b, i);
       b.onclick = () => {
         const next = cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i].sort((a, c) => a - c);
         cur = next;
@@ -264,7 +274,7 @@ function render(){
     b.disabled = !open;
     b.setAttribute('aria-pressed', picked === i);
     b.innerHTML = '<span class="dot" aria-hidden="true"></span><span></span>';
-    b.lastChild.textContent = o;
+    b.lastChild.textContent = o; addOptImg(b, i);
     b.onclick = () => {
       if (picked === i) return;
       list.querySelectorAll('.opt').forEach(x => x.classList.remove('on')); b.classList.add('on');
