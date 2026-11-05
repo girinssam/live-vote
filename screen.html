@@ -336,8 +336,7 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
     <div class="ed-head"><h2>질문 편집</h2><button class="mini" id="edCancel">취소</button></div>
     <div class="ed-list" id="edList"></div>
     <div class="ed-foot">
-      <button class="btn" id="edAddChoice">+ 객관식 질문</button>
-      <button class="btn" id="edAddWord">+ 단어 질문</button>
+      <button class="btn" id="edAdd">+ 질문 추가</button>
       <button class="btn" id="edSample">예시 질문 넣기</button>
       <button class="btn primary" id="edSave">저장</button>
     </div>
@@ -876,8 +875,14 @@ function renderRows(q, qi, box){
   };
   box.appendChild(add);
 }
-$('#edAddChoice').onclick = () => addDraft('choice');
-$('#edAddWord').onclick = () => addDraft('word');
+// 새 질문은 객관식(빈 보기 2개)으로 시작, 형식은 카드 안에서 바꿈
+$('#edAdd').onclick = () => {
+  addDraft('choice');
+  const items = $('#edList').querySelectorAll('.item'), it = items[items.length - 1];
+  if (!it) return;
+  it.scrollIntoView({ block:'nearest' });
+  it.querySelector('.t').focus();
+};
 $('#edSample').onclick = () => SAMPLES.forEach(s => addDraft(s.kind, s.text, s.options));
 $('#edCancel').onclick = () => $('#editor').close();
 $('#edSave').onclick = async () => {
