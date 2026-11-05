@@ -214,6 +214,21 @@ dialog::backdrop{background:rgba(59,46,30,.55)}
 .btn{border-radius:10px;padding:9px 16px;font-size:15px;font-weight:600;border:1.5px solid var(--leaf);background:transparent;color:var(--leaf)}
 .btn.primary{background:var(--leaf);color:var(--paper);margin-left:auto}
 .ed-empty{color:var(--muted);text-align:center;padding:24px 0}
+.linkf{display:grid;gap:8px}
+.linkf[hidden]{display:none}
+.linkf input{font:inherit;font-size:16px;border:1.5px solid var(--mist);border-radius:10px;padding:8px 10px;background:var(--paper);color:var(--ink);width:100%}
+.item .hint:empty{display:none}
+
+/* 링크 안내 */
+body.link-mode .stage{grid-template-columns:1fr}
+body.link-mode .side,body.link-mode .meta{display:none}
+.bar button:disabled{opacity:.35;cursor:default}
+.bar button:disabled:hover{background:transparent}
+.linkview{display:flex;flex-direction:column;align-items:center;gap:14px;padding:4px 0 10px;text-align:center}
+.linkqr{background:#fff;padding:16px;border-radius:16px;border:2px solid var(--mist)}
+.linkqr img,.linkqr canvas{display:block}
+.linkurl{margin:0;font-size:clamp(20px,2vw,30px);font-weight:600;color:var(--leaf);word-break:break-all;max-width:90%}
+.linkdesc{margin:0;font-size:clamp(18px,1.7vw,24px);color:var(--muted);max-width:90%;word-break:keep-all}
 .label.has-img{display:flex;align-items:center;gap:12px}
 .label .limg{flex:none;width:48px;height:48px;object-fit:contain;border-radius:8px}
 
@@ -355,13 +370,14 @@ function watchResponses(){
 const curIndex = () => state ? questions.findIndex(q => q.id === state.qid) : -1;
 function goTo(i){
   const q = questions[i]; if (!q) return;
-  S.setState({ qid:q.id, kind:q.kind, text:q.text, options:q.options || [], optImages:q.optImages || [], multi:!!q.multi, round:q.round || 0, open:false, hidden:[] }).catch(onErr);
+  S.setState({ qid:q.id, kind:q.kind, text:q.text, options:q.options || [], optImages:q.optImages || [], multi:!!q.multi, url:q.url || '', desc:q.desc || '', round:q.round || 0, open:false, hidden:[] }).catch(onErr);
 }
 function step(d){ const i = curIndex(); goTo(i < 0 ? 0 : Math.min(Math.max(i + d, 0), questions.length - 1)); }
-function toggleOpen(){ if (state && state.qid) S.setState({ open: !state.open }).catch(onErr); }
-function toggleShow(){ showResults = !showResults; render(); }
+const isLink = () => !!(state && state.qid && state.kind === 'link');
+function toggleOpen(){ if (state && state.qid && !isLink()) S.setState({ open: !state.open }).catch(onErr); }
+function toggleShow(){ if (isLink()) return; showResults = !showResults; render(); }
 function resetQ(){
-  const q = questions[curIndex()]; if (!q) return;
+  const q = questions[curIndex()]; if (!q || isLink()) return;
   if (!confirm('지금 질문의 응답을 모두 비우고 처음부터 다시 받을까요?')) return;
   const r = (q.round || 0) + 1;
   S.saveQuestion({ ...q, round:r }).then(() => S.setState({ round:r, hidden:[] })).catch(onErr);
@@ -406,6 +422,9 @@ function render(){
   ob.textContent = open ? '응답 마감' : '응답 시작';
   ob.className = open ? 'stop' : 'go';
   $('#showBtn').textContent = showResults ? '결과 숨기기' : '결과 보이기';
+  const link = isLink();
+  document.body.classList.toggle('link-mode', link);
+  ['#openBtn', '#showBtn', '#resetBtn'].forEach(s => { $(s).disabled = link; });
   renderResults();
 }
 
@@ -416,8 +435,35 @@ function renderResults(){
   if (!state || !state.qid){ box.innerHTML = ''; box.dataset.sig = ''; return; }
   if (state.kind === 'word') return renderCloud(box);
   if (state.kind === 'memo') return renderBoard(box);
+  if (state.kind === 'link') return renderLink(box);
   renderBars(box);
 }
+
+/* ── 링크 안내 ── */
+const isHttp = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
+function renderLink(box){
+  const url = (state.url || '').trim();
+  const sig = 'link:' + JSON.stringify([url, state.desc || '', innerWidth, innerHeight]);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig; box.innerHTML = '';
+  const v = document.createElement('div'); v.className = 'linkview';
+  if (!isHttp(url)){
+    const p = document.createElement('p'); p.className = 'empty'; p.textContent = '주소는 https://로 시작해야 해요';
+    v.appendChild(p); box.appendChild(v); return;
+  }
+  const qr = document.createElement('div'); qr.className = 'linkqr';
+  const u = document.createElement('p'); u.className = 'linkurl'; u.textContent = url.replace(/^https?:\/\//i, '');
+  v.append(qr, u);
+  if (state.desc){ const d = document.createElement('p'); d.className = 'linkdesc'; d.textContent = state.desc; v.appendChild(d); }
+  box.appendChild(v);
+  if (!window.QRCode){ qr.textContent = 'QR 도구를 불러오지 못했어요 (인터넷 확인)'; return; }
+  // 화면 높이의 50% 정도, 단 주소·설명까지 결과 영역 안에 들어가게 (QR을 뺀 높이를 재서 남은 만큼)
+  const room = box.clientHeight - v.offsetHeight - 4;
+  const size = Math.max(160, Math.min(Math.round(innerHeight * 0.5), room));
+  try { new QRCode(qr, { text:url, width:size, height:size, colorDark:'#2E3A46', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M }); }
+  catch (e){ qr.textContent = '주소가 너무 길어서 QR을 만들지 못했어요'; }
+}
+addEventListener('resize', () => { clearTimeout(window._lkT); window._lkT = setTimeout(() => { if (isLink()) renderResults(); }, 300); });
 
 /* ── 메모 칠판 ── */
 const MEMO_COLORS = ['#FFF3B0', '#DCEEFF', '#E3F5E1', '#FCE4EC'];
@@ -657,18 +703,24 @@ function renderEditor(){
     it.innerHTML = `
       <div class="item-top">
         <span class="n">${i + 1}</span>
-        <select aria-label="질문 형식"><option value="choice">객관식</option><option value="word">단어 응답</option><option value="memo">메모</option></select>
+        <select aria-label="질문 형식"><option value="choice">객관식</option><option value="word">단어 응답</option><option value="memo">메모</option><option value="link">링크 안내</option></select>
         <button class="mini up" aria-label="위로">▲</button><button class="mini down" aria-label="아래로">▼</button>
         <button class="mini del">삭제</button>
       </div>
       <textarea class="t" rows="2" placeholder="질문을 입력하세요" aria-label="질문"></textarea>
       <div class="orows"></div>
+      <div class="linkf"><input class="u" type="url" inputmode="url" placeholder="https://" aria-label="주소"><input class="dsc" placeholder="설명 한 줄 (선택)" aria-label="설명" maxlength="120"></div>
       <label class="multi"><input type="checkbox" class="m">복수 응답 허용</label>
-      <p class="hint">${q.kind === 'choice' ? '보기는 한 줄에 하나씩, 2~8개' : q.kind === 'memo' ? '참여자 한 명이 200자 이내 메모를 3장까지 붙일 수 있어요' : '참여자 한 명이 12자 이내 단어를 3개까지 보낼 수 있어요'}</p>
+      <p class="hint">${q.kind === 'choice' ? '보기는 한 줄에 하나씩, 2~8개' : q.kind === 'memo' ? '참여자 한 명이 200자 이내 메모를 3장까지 붙일 수 있어요' : q.kind === 'link' ? '' : '참여자 한 명이 12자 이내 단어를 3개까지 보낼 수 있어요'}</p>
       <p class="warn" hidden></p>`;
     const sel = it.querySelector('select'), t = it.querySelector('.t'), box = it.querySelector('.orows');
     sel.value = q.kind; t.value = q.text;
     box.hidden = q.kind !== 'choice';
+    const lf = it.querySelector('.linkf'), u = it.querySelector('.u'), dsc = it.querySelector('.dsc');
+    lf.hidden = q.kind !== 'link';
+    u.value = q.url || ''; dsc.value = q.desc || '';
+    u.oninput = () => { q.url = u.value; };
+    dsc.oninput = () => { q.desc = dsc.value; };
     if (q.kind === 'choice') renderRows(q, i, box);
     const m = it.querySelector('.m');
     m.checked = !!q.multi; m.closest('.multi').hidden = q.kind !== 'choice';
@@ -738,10 +790,13 @@ $('#edSave').onclick = async () => {
     q.options = rows.map(r => r.text);
     q.optImages = rows.map(r => r.img);
     q.multi = q.kind === 'choice' && !!q.multi;
+    q.url = q.kind === 'link' ? (q.url || '').trim() : '';
+    q.desc = q.kind === 'link' ? (q.desc || '').trim() : '';
     let msg = '';
     if (!q.text) msg = '질문을 입력해 주세요.';
     else if (rows.some(r => !r.text)) msg = '이미지를 넣은 보기에도 글자를 적어 주세요.';
     else if (q.kind === 'choice' && q.options.length < 2) msg = '보기를 2개 이상 적어 주세요.';
+    else if (q.kind === 'link' && !isHttp(q.url)) msg = '주소는 https://로 시작해야 해요';
     else if (JSON.stringify({ text:q.text, options:q.options, optImages:q.optImages }).length > Q_BYTES) msg = '이미지가 너무 커요';
     it.classList.toggle('bad', !!msg);
     const w = it.querySelector('.warn'); w.textContent = msg; w.hidden = !msg;
@@ -751,12 +806,12 @@ $('#edSave').onclick = async () => {
   try {
     const keep = new Set(draft.map(q => q.id));
     await Promise.all([
-      ...draft.map((q, i) => S.saveQuestion({ id:q.id, kind:q.kind, text:q.text, options:q.options, optImages:q.optImages, multi:q.multi, round:q.round || 0, order:i })),
+      ...draft.map((q, i) => S.saveQuestion({ id:q.id, kind:q.kind, text:q.text, options:q.options, optImages:q.optImages, multi:q.multi, url:q.url, desc:q.desc, round:q.round || 0, order:i })),
       ...questions.filter(q => !keep.has(q.id)).map(q => S.deleteQuestion(q.id))
     ]);
     const cur = state && draft.find(q => q.id === state.qid);
-    if (cur) await S.setState({ kind:cur.kind, text:cur.text, options:cur.options, optImages:cur.optImages, multi:cur.multi });
-    else if (draft.length) await S.setState({ qid:draft[0].id, kind:draft[0].kind, text:draft[0].text, options:draft[0].options, optImages:draft[0].optImages, multi:draft[0].multi, round:draft[0].round || 0, open:false, hidden:[] });
+    if (cur) await S.setState({ kind:cur.kind, text:cur.text, options:cur.options, optImages:cur.optImages, multi:cur.multi, url:cur.url, desc:cur.desc });
+    else if (draft.length) await S.setState({ qid:draft[0].id, kind:draft[0].kind, text:draft[0].text, options:draft[0].options, optImages:draft[0].optImages, multi:draft[0].multi, url:draft[0].url, desc:draft[0].desc, round:draft[0].round || 0, open:false, hidden:[] });
     else await S.setState({ qid:null, open:false });
     $('#editor').close();
   } catch (e){ onErr(e); }

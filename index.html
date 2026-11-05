@@ -134,6 +134,13 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-
 .send button,.primary{background:var(--strong);color:var(--ink)}
 .mine span{background:var(--mist);color:var(--ink)}
 
+/* 링크 안내 */
+.ldesc{font-size:17px;line-height:1.5;color:var(--ink);margin:0 0 20px;word-break:keep-all;white-space:pre-wrap}
+.lbtn{display:flex;align-items:center;justify-content:center;width:100%;min-height:60px;border-radius:14px;background:var(--strong);color:var(--ink);
+  font-size:20px;font-weight:700;text-decoration:none}
+.lbtn:focus-visible{outline:3px solid var(--ochre);outline-offset:2px}
+.ldomain{font-size:14px;color:var(--muted);text-align:center;margin:8px 0 0;word-break:break-all}
+
 /* 메모 */
 .memo-form{display:grid;gap:8px}
 .memo-form textarea{width:100%;min-height:120px;font:inherit;font-size:18px;line-height:1.45;padding:14px;border-radius:12px;border:2px solid var(--mist);background:var(--surface);color:var(--ink);resize:vertical}
@@ -176,6 +183,22 @@ function addOptImg(b, i){
   b.insertBefore(im, b.lastChild);
 }
 
+// 링크 안내: 응답 시작 여부와 상관없이 바로 보여 줌
+function renderLink(){
+  const h = document.createElement('h1'); h.className = 'q'; h.textContent = state.text || '';
+  app.appendChild(h);
+  if (state.desc){ const d = document.createElement('p'); d.className = 'ldesc'; d.textContent = state.desc; app.appendChild(d); }
+  const url = typeof state.url === 'string' ? state.url.trim() : '';
+  let host = '';
+  if (/^https?:\/\/\S+$/i.test(url)){ try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e){ host = ''; } }
+  if (!host) return;                       // http(s) 주소가 아니면 버튼을 만들지 않음
+  const a = document.createElement('a'); a.className = 'lbtn';
+  a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = '사이트 열기';
+  const dm = document.createElement('p'); dm.className = 'ldomain'; dm.textContent = host;
+  const g = document.createElement('p'); g.className = 'small'; g.textContent = '버튼을 누르면 새 창으로 열려요. 다 보고 이 창으로 돌아와 주세요.';
+  app.append(a, dm, g);
+}
+
 let toastT;
 function toast(msg, bad){
   const t = document.getElementById('toast');
@@ -200,7 +223,7 @@ setTimeout(() => {
 function render(){
   const key = S.qkey(state);
   const mine = (loadMine()[key]) || {};
-  const sig = JSON.stringify([key, state && state.open, state && state.text, state && state.options, state && state.kind, state && !!state.multi, state && state.optImages, mine]);
+  const sig = JSON.stringify([key, state && state.open, state && state.text, state && state.options, state && state.kind, state && !!state.multi, state && state.optImages, state && state.url, state && state.desc, mine]);
   if (sig === lastSig) return;          // 입력 중인 글자가 지워지지 않게
   lastSig = sig;
 
@@ -210,6 +233,7 @@ function render(){
   }
   const open = !!state.open;
   app.innerHTML = '';
+  if (state.kind === 'link'){ renderLink(); return; }
   const h = document.createElement('h1'); h.className = 'q'; h.textContent = state.text || '';
   const st = document.createElement('p'); st.className = 'status' + (open ? ' open' : '');
   app.append(h, st);
