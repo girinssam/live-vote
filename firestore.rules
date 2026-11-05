@@ -6,13 +6,20 @@ service cloud.firestore {
     match /responses/{id} {
       allow read: if true;
       allow create, update: if
-        request.resource.data.keys().hasOnly(['qkey', 'voter', 'kind', 'choice', 'word', 'ts'])
+        request.resource.data.keys().hasOnly(['qkey', 'voter', 'kind', 'choice', 'choices', 'word', 'ts'])
         && request.resource.data.qkey is string && request.resource.data.qkey.size() < 80
         && request.resource.data.voter is string && request.resource.data.voter.size() < 40
         && (
           (request.resource.data.kind == 'choice'
-            && request.resource.data.choice is int
-            && request.resource.data.choice >= 0 && request.resource.data.choice < 8)
+            && (
+              ('choice' in request.resource.data
+                && request.resource.data.choice is int
+                && request.resource.data.choice >= 0 && request.resource.data.choice < 8)
+              ||
+              ('choices' in request.resource.data
+                && request.resource.data.choices is list
+                && request.resource.data.choices.size() <= 8)
+            ))
           ||
           (request.resource.data.kind == 'word'
             && request.resource.data.word is string
