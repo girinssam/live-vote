@@ -3,7 +3,7 @@
 | 파일 | 역할 |
 |---|---|
 | `index.html` | 학생용 참여 화면 (QR로 접속) |
-| `screen.html` | 강사용 화면 (질문 띄우기, 실시간 그래프·워드클라우드, QR) |
+| `screen.html` | 선생님용 화면 (질문 띄우기, 실시간 그래프·워드클라우드, QR) |
 | `config.js` | Firebase 설정값, 학생 페이지 주소 — **이 파일만 고치면 됨** |
 | `vote-core.js` | 데이터 연결 공통 코드 (수정 불필요) |
 | `firestore.rules` | Firestore 보안 규칙 (Firebase 콘솔에 붙여 넣기) |
@@ -21,7 +21,7 @@
 6. 강의 때 선생님 화면은 **반드시 GitHub Pages 주소로 열고 로그인**: `https://girinssam.github.io/live-vote/screen.html`
    (`config.js`의 ADMIN_EMAIL 구글 계정으로 로그인해야 질문·화면 상태를 바꿀 수 있음. 내 컴퓨터 파일로 열면 로그인이 안 됨)
 
-## 강사 로그인
+## 선생님 로그인
 - 선생님 화면(`screen.html`)은 `config.js`의 `ADMIN_EMAIL` 구글 계정으로 로그인해야 열림. 학생 화면은 로그인 없음
 - Firestore 보안 규칙도 이 계정만 질문(questions)·화면 상태(state)를 쓸 수 있게 막아 둠. 계정을 바꾸면 `firestore.rules`도 함께 바꾸고 다시 배포
 - 연습 모드(apiKey 비어 있음)에서는 로그인 없이 열림
