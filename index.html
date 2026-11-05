@@ -133,6 +133,16 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-
 .status.open{color:var(--leaf)}
 .send button,.primary{background:var(--strong);color:var(--ink)}
 .mine span{background:var(--mist);color:var(--ink)}
+
+/* 메모 */
+.memo-form{display:grid;gap:8px}
+.memo-form textarea{width:100%;min-height:120px;font:inherit;font-size:18px;line-height:1.45;padding:14px;border-radius:12px;border:2px solid var(--mist);background:var(--surface);color:var(--ink);resize:vertical}
+.memo-form textarea:focus-visible{outline:3px solid var(--ochre);outline-offset:2px}
+.memo-foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.memo-foot .left{font-size:14px;color:var(--muted)}
+.memo-foot .primary:disabled{opacity:.5}
+.mymemos{display:grid;gap:10px;margin-top:8px}
+.mymemos div{padding:12px 14px;border-radius:6px;color:var(--ink);font-size:15px;line-height:1.45;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;box-shadow:0 1px 4px rgba(46,58,70,.12)}
 </style>
 </head>
 <body>
@@ -173,6 +183,11 @@ function toast(msg, bad){
   clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast', 2600);
 }
 const FAIL = '보내지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.';
+
+// 메모 (강사 화면 칠판과 같은 규칙으로 문서 id에서 색을 정함)
+const MEMO_MAX = 200;
+const MEMO_COLORS = ['#FFF3B0', '#DCEEFF', '#E3F5E1', '#FCE4EC'];
+function memoHash(s){ let h = 2166136261; for (const ch of s){ h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 
 S.onState(st => { state = st; got = true; render(); }, () => {
   app.innerHTML = '<div class="wait"><img class="g" src="girin.png" alt="" aria-hidden="true">연결이 끊겼어요.<br>와이파이나 데이터를 확인하고 새로고침해 주세요.</div>';
@@ -227,6 +242,46 @@ function render(){
       const box = document.createElement('div'); box.className = 'mine';
       words.forEach(w => { const s = document.createElement('span'); s.textContent = w; box.appendChild(s); });
       const p = document.createElement('p'); p.className = 'small'; p.textContent = '내가 보낸 단어';
+      app.append(p, box);
+    }
+    return;
+  }
+
+  if (state.kind === 'memo'){
+    const memos = Array.isArray(mine.memos) ? mine.memos : [];
+    st.textContent = open ? (memos.length >= 3 ? '메모 3장을 모두 붙였어요. 고마워요!' : `메모를 적어 주세요 (${memos.length}/3)`)
+                          : '지금은 응답을 받지 않아요. 강사님 안내를 기다려 주세요.';
+    if (open && memos.length < 3){
+      const f = document.createElement('form'); f.className = 'memo-form';
+      f.innerHTML = '<textarea maxlength="200" rows="4" placeholder="200자 이내 메모" aria-label="메모 입력"></textarea>'
+        + '<div class="memo-foot"><span class="left" aria-live="polite"></span><button class="primary">붙이기</button></div>';
+      const ta = f.querySelector('textarea'), btn = f.querySelector('button'), left = f.querySelector('.left');
+      const count = () => { left.textContent = `${MEMO_MAX - ta.value.length}자 남았어요`; };
+      ta.oninput = count; count();
+      f.onsubmit = (e) => {
+        e.preventDefault();
+        const text = ta.value.replace(/\r\n?/g, '\n').trim();
+        if (!text || text.length > MEMO_MAX){ ta.focus(); return; }
+        btn.disabled = true;
+        const n = memos.length;
+        S.setResponse(`${key}__${S.voterId}__m${n}`, { qkey:key, voter:S.voterId, kind:'memo', text, ts:Date.now() })
+          .then(() => {
+            const m = loadMine(); m[key] = { memos:[...memos, text] }; saveMine(m);
+            toast('메모를 붙였어요'); render();
+            const next = app.querySelector('textarea'); if (next) next.focus();
+          })
+          .catch(() => { btn.disabled = false; toast(FAIL, true); });
+      };
+      app.appendChild(f);
+    }
+    if (memos.length){
+      const p = document.createElement('p'); p.className = 'small'; p.textContent = '내가 붙인 메모';
+      const box = document.createElement('div'); box.className = 'mymemos';
+      memos.forEach((t, i) => {
+        const c = document.createElement('div'); c.textContent = t;
+        c.style.background = MEMO_COLORS[memoHash(`${key}__${S.voterId}__m${i}`) % MEMO_COLORS.length];
+        box.appendChild(c);
+      });
       app.append(p, box);
     }
     return;

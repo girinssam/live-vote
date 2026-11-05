@@ -29,7 +29,7 @@
     Store.onQuestions = (cb, err) => db.collection('questions').onSnapshot(s => cb(s.docs.map(d => d.data()).sort(byOrder)), err);
     Store.saveQuestion = (q) => db.doc('questions/' + q.id).set(q);
     Store.deleteQuestion = (id) => db.doc('questions/' + id).delete();
-    Store.onResponses = (qkey, cb, err) => db.collection('responses').where('qkey', '==', qkey).onSnapshot(s => cb(s.docs.map(d => d.data())), err);
+    Store.onResponses = (qkey, cb, err) => db.collection('responses').where('qkey', '==', qkey).onSnapshot(s => cb(s.docs.map(d => Object.assign({}, d.data(), { _id: d.id }))), err);
     Store.setResponse = (id, data) => db.doc('responses/' + id).set(data);
   } else {
     const K = 'girinvote_demo';
@@ -46,7 +46,7 @@
     Store.onQuestions = (cb) => sub(d => cb(Object.values(d.questions).sort(byOrder)));
     Store.saveQuestion = (q) => mutate(d => { d.questions[q.id] = q; });
     Store.deleteQuestion = (id) => mutate(d => { delete d.questions[id]; });
-    Store.onResponses = (qkey, cb) => sub(d => cb(Object.values(d.responses).filter(r => r.qkey === qkey)));
+    Store.onResponses = (qkey, cb) => sub(d => cb(Object.entries(d.responses).filter(([, r]) => r.qkey === qkey).map(([id, r]) => Object.assign({}, r, { _id: id }))));
     Store.setResponse = (id, data) => mutate(d => { d.responses[id] = data; });
     Store.clearDemo = () => { localStorage.removeItem(K); fire(); };
   }
