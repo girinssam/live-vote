@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>실시간 소통창</title>
+<link rel="icon" href="girin.png">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <style>
 @font-face {
@@ -82,7 +83,7 @@ button,input{font:inherit}
 button:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-offset:2px}
 .wrap{max-width:560px;margin:0 auto;padding:18px 20px 40px}
 .brand{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--leaf)}
-.brand .g{font-size:18px}
+.brand .g{width:26px;height:26px}
 .demo{background:var(--ochre);color:var(--ink);padding:2px 8px;border-radius:99px;font-size:12px;margin-left:auto}
 .q{font-size:24px;line-height:1.4;font-weight:700;margin:22px 0 8px;word-break:keep-all}
 .status{font-size:15px;color:var(--muted);margin:0 0 20px}
@@ -104,7 +105,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-
 .mine span{background:var(--leaf);color:var(--paper);padding:6px 12px;border-radius:99px;font-size:15px;font-weight:600}
 .small{font-size:14px;color:var(--muted);margin:10px 0 0}
 .wait{margin-top:60px;text-align:center;color:var(--muted);font-size:17px;line-height:1.6}
-.wait .g{font-size:54px;display:block;margin-bottom:10px}
+.wait .g{width:88px;height:88px;display:block;margin:0 auto 12px}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;
   background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:12px;font-size:15px;max-width:90vw;text-align:center;transition:.25s;pointer-events:none}
 .toast.on{opacity:1;transform:translate(-50%,0)}
@@ -115,8 +116,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-
 </head>
 <body>
 <main class="wrap">
-  <div class="brand"><span class="g" aria-hidden="true">🦒</span>꿈부자기린쌤 실시간 소통창<span class="demo" id="demo" hidden>연습 모드</span></div>
-  <div id="app"><div class="wait"><span class="g" aria-hidden="true">🦒</span>연결하는 중이에요…</div></div>
+  <div class="brand"><img class="g" src="girin.png" alt="" aria-hidden="true">꿈부자기린쌤 실시간 소통창<span class="demo" id="demo" hidden>연습 모드</span></div>
+  <div id="app"><div class="wait"><img class="g" src="girin.png" alt="" aria-hidden="true">연결하는 중이에요…</div></div>
   <p class="foot">응답은 이름 없이 모여요</p>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -144,11 +145,11 @@ function toast(msg, bad){
 const FAIL = '보내지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.';
 
 S.onState(st => { state = st; got = true; render(); }, () => {
-  app.innerHTML = '<div class="wait"><span class="g" aria-hidden="true">🦒</span>연결이 끊겼어요.<br>와이파이나 데이터를 확인하고 새로고침해 주세요.</div>';
+  app.innerHTML = '<div class="wait"><img class="g" src="girin.png" alt="" aria-hidden="true">연결이 끊겼어요.<br>와이파이나 데이터를 확인하고 새로고침해 주세요.</div>';
   lastSig = '';
 });
 setTimeout(() => {
-  if (!got) app.innerHTML = '<div class="wait"><span class="g" aria-hidden="true">🦒</span>연결이 늦어지고 있어요.<br>와이파이나 데이터를 확인하고 새로고침해 주세요.</div>';
+  if (!got) app.innerHTML = '<div class="wait"><img class="g" src="girin.png" alt="" aria-hidden="true">연결이 늦어지고 있어요.<br>와이파이나 데이터를 확인하고 새로고침해 주세요.</div>';
 }, 10000);
 
 function render(){
@@ -159,7 +160,7 @@ function render(){
   lastSig = sig;
 
   if (!key){
-    app.innerHTML = '<div class="wait"><span class="g" aria-hidden="true">🦒</span>강의 화면에 질문이 뜨면<br>여기에도 바로 나타나요.</div>';
+    app.innerHTML = '<div class="wait"><img class="g" src="girin.png" alt="" aria-hidden="true">강의 화면에 질문이 뜨면<br>여기에도 바로 나타나요.</div>';
     return;
   }
   const open = !!state.open;

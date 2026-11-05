@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>실시간 소통창 · 강사 화면</title>
+<link rel="icon" href="girin.png">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <style>
 @font-face {
@@ -90,7 +91,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-vis
 /* 상단 */
 .top{display:flex;align-items:center;justify-content:space-between;padding:18px 40px 0;color:var(--muted);font-size:15px}
 .brand{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--leaf)}
-.brand .g{font-size:22px}
+.brand .g{width:36px;height:36px}
 .pos{font-variant-numeric:tabular-nums}
 .demo{background:var(--ochre);color:var(--ink);padding:3px 10px;border-radius:99px;font-weight:600;font-size:13px;margin-left:10px}
 
@@ -197,7 +198,7 @@ dialog::backdrop{background:rgba(29,39,34,.55)}
 <div class="err" id="err" role="alert"></div>
 
 <header class="top">
-  <div class="brand"><span class="g" aria-hidden="true">🦒</span>꿈부자기린쌤 실시간 소통창<span id="demoBadge" class="demo" hidden>연습 모드</span></div>
+  <div class="brand"><img class="g" src="girin.png" alt="" aria-hidden="true">꿈부자기린쌤 실시간 소통창<span id="demoBadge" class="demo" hidden>연습 모드</span></div>
   <div class="pos" id="pos"></div>
 </header>
 
