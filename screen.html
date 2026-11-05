@@ -136,9 +136,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-vis
 /* 메모 칠판 */
 .memo-tools{display:flex;justify-content:flex-end;font-size:14px;color:var(--muted);margin:0 0 8px;min-height:1px}
 .memo-tools button{background:none;border:0;padding:2px;font-size:14px;color:var(--leaf);text-decoration:underline}
-.board{columns:3;column-gap:18px;padding:4px 4px 20px}
-@media (min-width:1500px){ .board{columns:4} }
-@media (min-width:1900px){ .board{columns:5} }
+.board{display:flex;align-items:flex-start;gap:18px;padding:4px 4px 20px}
+.bcol{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
 .memo{break-inside:avoid;margin:0 0 18px;padding:18px 20px;border-radius:6px;color:var(--ink);font-size:23px;line-height:1.45;
   white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;box-shadow:0 2px 6px rgba(46,58,70,.12);cursor:zoom-in}
 .memo:focus-visible{outline:3px solid var(--strong);outline-offset:2px}
@@ -335,7 +334,7 @@ const S = window.VoteStore;
 const $ = (s) => document.querySelector(s);
 const isImg = (v) => typeof v === 'string' && v.startsWith('data:image/');
 let questions = [], state = null, responses = [], showResults = true;
-let unsubResp = null, curKey = null, seenWords = new Set(), seenMemos = new Set(), autoStarted = false, qLoaded = false;
+let unsubResp = null, curKey = null, seenWords = new Set(), seenMemos = new Set(), autoStarted = false, qLoaded = false, stateLoaded = false;
 
 if (!S.live) $('#demoBadge').hidden = false;
 
@@ -349,11 +348,13 @@ function onErr(e){
 
 /* ── 구독 ── */
 S.onQuestions(qs => { questions = qs; qLoaded = true; maybeAutoStart(); render(); }, onErr);
-S.onState(st => { state = st; watchResponses(); maybeAutoStart(); render(); }, onErr);
+S.onState(st => { state = st; stateLoaded = true; watchResponses(); maybeAutoStart(); render(); }, onErr);
 
 function maybeAutoStart(){
   // 처음 열었을 때 띄운 질문이 없으면 첫 질문을 띄움
-  if (autoStarted || !qLoaded) return;
+  // 질문 목록과 현재 상태를 둘 다 처음 받은 뒤에만 판단 (먼저 온 쪽만 보고 1번으로 돌아가지 않게)
+  // state의 qid가 목록에 없어도(삭제된 질문) 자동으로 바꾸지 않음
+  if (autoStarted || !qLoaded || !stateLoaded) return;
   autoStarted = true;
   if ((!state || !state.qid) && questions.length) goTo(0);
 }
@@ -469,46 +470,75 @@ addEventListener('resize', () => { clearTimeout(window._lkT); window._lkT = setT
 const MEMO_COLORS = ['#FFF3B0', '#DCEEFF', '#E3F5E1', '#FCE4EC'];
 const memoColor = (id) => MEMO_COLORS[hash(String(id)) % MEMO_COLORS.length];
 let memoOpenId = null;
+// 칸 수: 화면 폭 1500px 미만 3칸, 1500px 이상 4칸, 1900px 이상 5칸
+const memoCols = () => innerWidth >= 1900 ? 5 : innerWidth >= 1500 ? 4 : 3;
+let boardView = null;   // { key, el, cols, placed }
+function makeMemoCard(r){
+  const m = document.createElement('div'); m.className = 'memo';
+  m.tabIndex = 0; m.setAttribute('role', 'button');
+  m.style.background = memoColor(r._id);
+  m.textContent = r.text;
+  if (!seenMemos.has(r._id)){ m.classList.add('new'); seenMemos.add(r._id); }
+  m.onclick = () => openMemo(r);
+  m.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openMemo(r); } };
+  return m;
+}
+function placeMemo(view, r){
+  // 지금 가장 짧은 칸 맨 아래에 붙임 (높이가 같으면 왼쪽 칸)
+  let best = view.cols[0];
+  for (const c of view.cols) if (c.offsetHeight < best.offsetHeight) best = c;
+  best.appendChild(makeMemoCard(r));
+  view.placed.add(r._id);
+}
 function renderBoard(box){
   box.dataset.sig = 'memo';
-  const hidden = new Set(state && Array.isArray(state.hidden) ? state.hidden : []);
+  const hiddenList = state && Array.isArray(state.hidden) ? state.hidden : [];
+  const hidden = new Set(hiddenList);
   const all = responses.filter(r => r.kind === 'memo' && typeof r.text === 'string' && r.text.trim())
     .sort((a, b) => (a.ts || 0) - (b.ts || 0) || String(a._id).localeCompare(String(b._id)));
   const shown = all.filter(r => !hidden.has(r._id));
   const hiddenN = all.length - shown.length;
-  const keepScroll = box.scrollTop;
-  box.innerHTML = '';
   if (!showResults){
+    boardView = null;
     box.innerHTML = `<p class="empty">메모 ${all.length}장이 모였어요. 잠시 후 공개해요.</p>`; return;
   }
-  const tools = document.createElement('div'); tools.className = 'memo-tools';
-  if (hiddenN){
-    tools.append(`숨긴 메모 ${hiddenN}개 · `);
-    const b = document.createElement('button'); b.textContent = '다시 보이기';
-    b.onclick = () => S.setState({ hidden:[] }).catch(onErr);
-    tools.appendChild(b);
-  }
-  box.appendChild(tools);
-  if (!shown.length){
-    const p = document.createElement('p'); p.className = 'empty'; p.textContent = '아직 붙은 메모가 없어요. QR을 찍고 메모를 남겨 주세요.';
-    box.appendChild(p);
+  // 숨기기·다시 보이기, 질문 바뀜, 칸 수 바뀜일 때만 전체를 다시 배치
+  const key = JSON.stringify([curKey, [...hiddenList].sort(), memoCols()]);
+  const intact = boardView && boardView.key === key && box.contains(boardView.el);
+  if (intact){
+    // 새 메모만 추가 (기존 카드는 그대로)
+    shown.forEach(r => { if (!boardView.placed.has(r._id)) placeMemo(boardView, r); });
   } else {
-    const board = document.createElement('div'); board.className = 'board';
-    shown.forEach(r => {
-      const m = document.createElement('div'); m.className = 'memo';
-      m.tabIndex = 0; m.setAttribute('role', 'button');
-      m.style.background = memoColor(r._id);
-      m.textContent = r.text;
-      if (!seenMemos.has(r._id)){ m.classList.add('new'); seenMemos.add(r._id); }
-      m.onclick = () => openMemo(r);
-      m.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openMemo(r); } };
-      board.appendChild(m);
-    });
-    box.appendChild(board);
+    const keepScroll = box.scrollTop;
+    box.innerHTML = '';
+    boardView = null;
+    const tools = document.createElement('div'); tools.className = 'memo-tools';
+    if (hiddenN){
+      tools.append(`숨긴 메모 ${hiddenN}개 · `);
+      const b = document.createElement('button'); b.textContent = '다시 보이기';
+      b.onclick = () => S.setState({ hidden:[] }).catch(onErr);
+      tools.appendChild(b);
+    }
+    box.appendChild(tools);
+    if (!shown.length){
+      const p = document.createElement('p'); p.className = 'empty'; p.textContent = '아직 붙은 메모가 없어요. QR을 찍고 메모를 남겨 주세요.';
+      box.appendChild(p);
+    } else {
+      const board = document.createElement('div'); board.className = 'board';
+      const cols = [];
+      for (let i = 0; i < memoCols(); i++){ const c = document.createElement('div'); c.className = 'bcol'; board.appendChild(c); cols.push(c); }
+      box.appendChild(board);
+      boardView = { key, el:board, cols, placed:new Set() };
+      shown.forEach(r => placeMemo(boardView, r));
+    }
+    box.scrollTop = keepScroll;
   }
-  box.scrollTop = keepScroll;
   if (memoOpenId && !shown.some(r => r._id === memoOpenId)) closeMemo();
 }
+addEventListener('resize', () => {
+  clearTimeout(window._bdT);
+  window._bdT = setTimeout(() => { if (state && state.kind === 'memo' && boardView && !boardView.key.endsWith(memoCols() + ']')) renderResults(); }, 200);
+});
 function openMemo(r){
   memoOpenId = r._id;
   const big = $('#memoBig'); big.textContent = r.text; big.style.background = memoColor(r._id);
