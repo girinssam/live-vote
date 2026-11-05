@@ -169,6 +169,14 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-vis
 .bar #logoutBtn{font-size:13px;padding:5px 10px}
 .bar #logoutBtn[hidden]{display:none}
 
+/* 로그아웃 확인 창 */
+#logoutDlg{width:min(420px,92vw)}
+#logoutDlg .lo{display:flex;flex-direction:column;gap:10px;padding:22px 24px}
+#logoutDlg h2{margin:0 0 6px;font-size:22px}
+#logoutDlg .btn{width:100%;margin:0;padding:12px 16px;font-size:16px}
+#logoutDlg .lo-note{margin:-4px 0 4px;font-size:13px;line-height:1.5;color:var(--muted)}
+#logoutDlg .lo-cancel{align-self:center;margin-top:4px}
+
 /* 강사 로그인 잠금 */
 .lock{position:fixed;inset:0;z-index:50;background:var(--paper);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
 .lock[hidden]{display:none}
@@ -326,6 +334,16 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
   <p id="urlBig"></p>
 </div>
 
+<dialog id="logoutDlg" aria-labelledby="loTitle">
+  <div class="lo">
+    <h2 id="loTitle">로그아웃할까요?</h2>
+    <button class="btn primary" id="loSite" autofocus>이 사이트만 로그아웃</button>
+    <button class="btn" id="loGoogle">구글 계정까지 로그아웃</button>
+    <p class="lo-note">이 브라우저의 모든 구글 계정(Gmail 등)이 로그아웃돼요. 강의실처럼 여러 사람이 쓰는 컴퓨터에서 눌러 주세요.</p>
+    <button class="mini lo-cancel" id="loCancel">취소</button>
+  </div>
+</dialog>
+
 <dialog id="memoView" aria-label="메모 크게 보기">
   <div class="big" id="memoBig"></div>
   <div class="acts"><button id="memoHide">칠판에서 숨기기</button><button id="memoClose">닫기</button></div>
@@ -417,7 +435,19 @@ $('#loginBtn').onclick = async () => {
         : '로그인하지 못했어요 (' + (code || (e && e.message) || e) + ')';
   } finally { $('#loginBtn').disabled = false; }
 };
-$('#logoutBtn').onclick = () => { closeMemo(); if ($('#editor').open) $('#editor').close(); S.signOut().catch(onErr); };
+// 로그아웃: 이 사이트만(Firebase) / 구글 계정까지(Firebase 로그아웃이 끝난 뒤 구글 로그아웃 화면으로 이동)
+const logoutDlg = $('#logoutDlg');
+function siteSignOut(){
+  logoutDlg.close(); closeMemo(); if ($('#editor').open) $('#editor').close();
+  return S.signOut();
+}
+$('#logoutBtn').onclick = () => { logoutDlg.showModal(); $('#loSite').focus(); };
+$('#loSite').onclick = () => { siteSignOut().catch(onErr); };
+$('#loGoogle').onclick = () => {
+  siteSignOut().then(() => { location.href = 'https://accounts.google.com/Logout'; }).catch(onErr);
+};
+$('#loCancel').onclick = () => logoutDlg.close();
+logoutDlg.addEventListener('click', (e) => { if (e.target === logoutDlg) logoutDlg.close(); });
 
 function maybeAutoStart(){
   // 처음 열었을 때 띄운 질문이 없으면 첫 질문을 띄움
@@ -465,7 +495,7 @@ $('#overlay').onclick = () => toggleQR(false);
 $('#editBtn').onclick = openEditor;
 
 document.addEventListener('keydown', (e) => {
-  if (locked || $('#editor').open || $('#memoView').open || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (locked || $('#editor').open || $('#memoView').open || logoutDlg.open || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   const k = e.key.toLowerCase();
   if (k === 'arrowright') step(1);
   else if (k === 'arrowleft') step(-1);
