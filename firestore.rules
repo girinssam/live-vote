@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 학생 응답: 읽기·쓰기 가능, 삭제 불가, 형식이 맞는 것만 저장
+    match /responses/{id} {
+      allow read: if true;
+      allow create, update: if
+        request.resource.data.keys().hasOnly(['qkey', 'voter', 'kind', 'choice', 'word', 'ts'])
+        && request.resource.data.qkey is string && request.resource.data.qkey.size() < 80
+        && request.resource.data.voter is string && request.resource.data.voter.size() < 40
+        && (
+          (request.resource.data.kind == 'choice'
+            && request.resource.data.choice is int
+            && request.resource.data.choice >= 0 && request.resource.data.choice < 8)
+          ||
+          (request.resource.data.kind == 'word'
+            && request.resource.data.word is string
+            && request.resource.data.word.size() > 0 && request.resource.data.word.size() <= 12)
+        );
+      allow delete: if false;
+    }
+
+    // 질문 목록과 현재 화면 상태 (강사 화면이 씀)
+    match /questions/{id} { allow read, write: if true; }
+    match /state/{id}     { allow read, write: if true; }
+  }
+}

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>실시간 투표 · 강사 화면</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --leaf:#234F3C;      /* 아카시아 잎 */
+  --leaf-2:#2F6650;
+  --paper:#F3F6EF;     /* 풀빛 종이 */
+  --mist:#DDE7DA;
+  --ochre:#E3A33A;     /* 기린 털 */
+  --spot:#7A4E25;      /* 기린 무늬 */
+  --ink:#1D2722;
+  --muted:#5E6B63;
+  --alert:#B5482F;
+  --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--font);display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-offset:2px}
+
+/* 상단 */
+.top{display:flex;align-items:center;justify-content:space-between;padding:18px 40px 0;color:var(--muted);font-size:15px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--leaf)}
+.brand .g{font-size:22px}
+.pos{font-variant-numeric:tabular-nums}
+.demo{background:var(--ochre);color:var(--ink);padding:3px 10px;border-radius:99px;font-weight:600;font-size:13px;margin-left:10px}
+
+/* 본문 */
+.stage{flex:1;display:grid;grid-template-columns:1fr 240px;gap:40px;padding:20px 40px 24px;min-height:0}
+.main{display:flex;flex-direction:column;min-height:0}
+.q{font-size:clamp(28px,3.6vw,52px);line-height:1.3;font-weight:700;margin:0 0 14px;max-width:28em;word-break:keep-all;letter-spacing:-.01em}
+.meta{display:flex;align-items:center;gap:16px;font-size:20px;color:var(--muted);margin-bottom:26px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:5px 14px;border-radius:99px;font-weight:600;font-size:17px;background:var(--mist);color:var(--leaf)}
+.chip.open{background:var(--leaf);color:var(--paper)}
+.chip.open::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--ochre);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.count b{color:var(--ink);font-size:26px;font-variant-numeric:tabular-nums}
+.results{flex:1;min-height:0;overflow:auto}
+
+/* 막대그래프 — 기린 무늬 */
+.bars{display:flex;flex-direction:column;gap:18px;max-width:1100px}
+.row{display:grid;grid-template-columns:minmax(140px,28%) 1fr 130px;align-items:center;gap:18px}
+.label{font-size:clamp(18px,1.9vw,26px);font-weight:600;line-height:1.3;word-break:keep-all}
+.track{height:clamp(34px,4.6vh,52px);background:var(--mist);border-radius:6px 26px 26px 6px;overflow:hidden;position:relative}
+.fill{height:100%;width:0;border-radius:6px 26px 26px 6px;transition:width .7s cubic-bezier(.2,.8,.2,1);
+  background-color:var(--ochre);
+  background-image:
+    radial-gradient(ellipse 13px 10px at 22% 30%, var(--spot) 92%, transparent 100%),
+    radial-gradient(ellipse 10px 14px at 72% 62%, var(--spot) 92%, transparent 100%),
+    radial-gradient(ellipse 8px 7px at 40% 88%, var(--spot) 92%, transparent 100%);
+  background-size:46px 40px;opacity:.95}
+.row.lead .fill{opacity:1}
+.row.lead .label{color:var(--spot)}
+.val{font-size:clamp(20px,2.1vw,30px);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.val small{font-size:.6em;color:var(--muted);font-weight:600;margin-left:6px}
+.hidden-note{margin-top:24px;font-size:20px;color:var(--muted)}
+
+/* 워드클라우드 */
+.cloud{display:flex;flex-wrap:wrap;justify-content:center;align-content:center;align-items:baseline;gap:10px 26px;min-height:100%;padding:10px 0 20px;max-width:1200px;margin:0 auto}
+.w{font-weight:700;line-height:1.15;transition:font-size .5s ease;word-break:keep-all}
+.w.new{animation:pop .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+.empty{font-size:22px;color:var(--muted);padding:30px 0}
+
+/* QR 옆 패널 */
+.side{display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:8px;text-align:center}
+.qrbox{background:#fff;padding:12px;border-radius:14px;cursor:zoom-in;border:2px solid var(--mist)}
+.qrbox img,.qrbox canvas{display:block}
+.side p{margin:0;font-size:15px;color:var(--muted);line-height:1.5}
+.url{font-size:13px;word-break:break-all;color:var(--leaf)}
+.linkbtn{background:none;border:0;color:var(--leaf);text-decoration:underline;font-size:13px;padding:2px}
+
+/* 하단 조작 막대 */
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--leaf);color:var(--paper);padding:10px 24px}
+.bar button{background:transparent;color:var(--paper);border:1.5px solid rgba(243,246,239,.35);border-radius:10px;padding:8px 14px;font-size:15px;font-weight:600}
+.bar button:hover{background:var(--leaf-2)}
+.bar button.go{background:var(--ochre);color:var(--ink);border-color:var(--ochre)}
+.bar button.stop{background:var(--paper);color:var(--leaf);border-color:var(--paper)}
+.bar .sep{width:1px;height:26px;background:rgba(243,246,239,.25);margin:0 6px}
+.bar .keys{margin-left:auto;font-size:13px;opacity:.7}
+body.bar-off .bar{display:none}
+
+/* QR 크게 */
+.overlay{position:fixed;inset:0;background:var(--leaf);color:var(--paper);display:none;flex-direction:column;align-items:center;justify-content:center;gap:24px;z-index:20;cursor:zoom-out}
+.overlay.on{display:flex}
+.overlay .qrbig{background:#fff;padding:22px;border-radius:22px}
+.overlay h2{margin:0;font-size:clamp(26px,3.4vw,44px)}
+.overlay p{margin:0;font-size:20px;opacity:.85}
+
+/* 오류 */
+.err{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:var(--alert);color:#fff;padding:10px 18px;border-radius:10px;font-size:15px;display:none;z-index:30;max-width:90vw}
+
+/* 질문 편집 */
+dialog{border:0;border-radius:18px;padding:0;width:min(760px,94vw);max-height:90vh;background:var(--paper);color:var(--ink);font-family:var(--font)}
+dialog::backdrop{background:rgba(29,39,34,.55)}
+.ed{display:flex;flex-direction:column;max-height:90vh}
+.ed-head{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--mist)}
+.ed-head h2{margin:0;font-size:22px}
+.ed-list{overflow:auto;padding:16px 24px;display:flex;flex-direction:column;gap:14px}
+.item{background:#fff;border:1.5px solid var(--mist);border-radius:14px;padding:14px 16px;display:grid;gap:10px}
+.item.bad{border-color:var(--alert)}
+.item-top{display:flex;gap:8px;align-items:center}
+.item-top .n{font-weight:700;color:var(--leaf);min-width:2em}
+.item select,.item textarea{font:inherit;font-size:16px;border:1.5px solid var(--mist);border-radius:10px;padding:8px 10px;background:var(--paper);color:var(--ink);width:100%}
+.item select{width:auto}
+.item textarea{resize:vertical}
+.item .hint{font-size:13px;color:var(--muted);margin:-4px 0 0}
+.item .warn{font-size:13px;color:var(--alert);margin:0}
+.mini{background:transparent;border:1.5px solid var(--mist);border-radius:8px;padding:5px 10px;font-size:14px;color:var(--ink)}
+.mini.del{color:var(--alert);margin-left:auto}
+.ed-foot{display:flex;gap:8px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--mist)}
+.btn{border-radius:10px;padding:9px 16px;font-size:15px;font-weight:600;border:1.5px solid var(--leaf);background:transparent;color:var(--leaf)}
+.btn.primary{background:var(--leaf);color:var(--paper);margin-left:auto}
+.ed-empty{color:var(--muted);text-align:center;padding:24px 0}
+
+@media (max-width:900px){
+  body{overflow:auto}
+  .stage{grid-template-columns:1fr;padding:16px 20px}
+  .side{flex-direction:row;justify-content:flex-start;text-align:left}
+  .row{grid-template-columns:1fr 90px}
+  .row .label{grid-column:1/-1}
+  .top{padding:14px 20px 0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="err" id="err" role="alert"></div>
+
+<header class="top">
+  <div class="brand"><span class="g" aria-hidden="true">🦒</span>꿈부자기린쌤 실시간 투표<span id="demoBadge" class="demo" hidden>연습 모드</span></div>
+  <div class="pos" id="pos"></div>
+</header>
+
+<section class="stage">
+  <div class="main">
+    <h1 class="q" id="qText">질문을 불러오는 중이에요</h1>
+    <div class="meta">
+      <span class="chip" id="chip">대기</span>
+      <span class="count">참여 <b id="voters">0</b>명</span>
+    </div>
+    <div class="results" id="results"></div>
+  </div>
+  <aside class="side">
+    <div class="qrbox" id="qrSmall" title="크게 보기 (Q)" role="button" tabindex="0" aria-label="QR 크게 보기"></div>
+    <div>
+      <p>휴대폰 카메라로<br>QR을 찍어 주세요</p>
+      <p class="url" id="urlText"></p>
+      <button class="linkbtn" id="urlEdit">주소 바꾸기</button>
+    </div>
+  </aside>
+</section>
+
+<nav class="bar" aria-label="강사 조작">
+  <button id="prev" aria-label="이전 질문">◀ 이전</button>
+  <button id="next" aria-label="다음 질문">다음 ▶</button>
+  <span class="sep"></span>
+  <button id="openBtn" class="go">투표 시작</button>
+  <button id="showBtn">결과 숨기기</button>
+  <button id="resetBtn">응답 비우기</button>
+  <span class="sep"></span>
+  <button id="qrBtn">QR 크게</button>
+  <button id="editBtn">질문 편집</button>
+  <span class="keys">←→ 질문 · Space 시작/마감 · R 결과 · Q QR · B 조작 막대</span>
+</nav>
+
+<div class="overlay" id="overlay" role="dialog" aria-label="접속 QR">
+  <h2>QR을 찍고 투표에 참여해 주세요</h2>
+  <div class="qrbig" id="qrBig"></div>
+  <p id="urlBig"></p>
+</div>
+
+<dialog id="editor">
+  <div class="ed">
+    <div class="ed-head"><h2>질문 편집</h2><button class="mini" id="edCancel">취소</button></div>
+    <div class="ed-list" id="edList"></div>
+    <div class="ed-foot">
+      <button class="btn" id="edAddChoice">+ 객관식 질문</button>
+      <button class="btn" id="edAddWord">+ 단어 질문</button>
+      <button class="btn" id="edSample">예시 질문 넣기</button>
+      <button class="btn primary" id="edSave">저장</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="vote-core.js"></script>
+<script>
+const S = window.VoteStore;
+const $ = (s) => document.querySelector(s);
+let questions = [], state = null, responses = [], showResults = true;
+let unsubResp = null, curKey = null, seenWords = new Set(), autoStarted = false, qLoaded = false;
+
+if (!S.live) $('#demoBadge').hidden = false;
+
+/* ── 오류 표시 ── */
+let errTimer;
+function onErr(e){
+  const el = $('#err');
+  el.textContent = '연결 오류: ' + (e && e.message ? e.message : e) + ' — 인터넷 연결, config.js, Firebase 보안 규칙을 확인해 주세요.';
+  el.style.display = 'block'; clearTimeout(errTimer); errTimer = setTimeout(() => el.style.display = 'none', 9000);
+}
+
+/* ── 구독 ── */
+S.onQuestions(qs => { questions = qs; qLoaded = true; maybeAutoStart(); render(); }, onErr);
+S.onState(st => { state = st; watchResponses(); maybeAutoStart(); render(); }, onErr);
+
+function maybeAutoStart(){
+  // 처음 열었을 때 띄운 질문이 없으면 첫 질문을 띄움
+  if (autoStarted || !qLoaded) return;
+  autoStarted = true;
+  if ((!state || !state.qid) && questions.length) goTo(0);
+}
+function watchResponses(){
+  const k = S.qkey(state);
+  if (k === curKey) return;
+  curKey = k; seenWords = new Set();
+  if (unsubResp) unsubResp();
+  unsubResp = null; responses = [];
+  if (k) unsubResp = S.onResponses(k, rs => { responses = rs; renderResults(); }, onErr);
+}
+
+/* ── 조작 ── */
+const curIndex = () => state ? questions.findIndex(q => q.id === state.qid) : -1;
+function goTo(i){
+  const q = questions[i]; if (!q) return;
+  S.setState({ qid:q.id, kind:q.kind, text:q.text, options:q.options || [], round:q.round || 0, open:false }).catch(onErr);
+}
+function step(d){ const i = curIndex(); goTo(i < 0 ? 0 : Math.min(Math.max(i + d, 0), questions.length - 1)); }
+function toggleOpen(){ if (state && state.qid) S.setState({ open: !state.open }).catch(onErr); }
+function toggleShow(){ showResults = !showResults; render(); }
+function resetQ(){
+  const q = questions[curIndex()]; if (!q) return;
+  if (!confirm('지금 질문의 응답을 모두 비우고 처음부터 다시 받을까요?')) return;
+  const r = (q.round || 0) + 1;
+  S.saveQuestion({ ...q, round:r }).then(() => S.setState({ round:r })).catch(onErr);
+}
+
+$('#prev').onclick = () => step(-1);
+$('#next').onclick = () => step(1);
+$('#openBtn').onclick = toggleOpen;
+$('#showBtn').onclick = toggleShow;
+$('#resetBtn').onclick = resetQ;
+$('#qrBtn').onclick = () => toggleQR(true);
+$('#qrSmall').onclick = () => toggleQR(true);
+$('#qrSmall').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleQR(true); } };
+$('#overlay').onclick = () => toggleQR(false);
+$('#editBtn').onclick = openEditor;
+
+document.addEventListener('keydown', (e) => {
+  if ($('#editor').open || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'arrowright') step(1);
+  else if (k === 'arrowleft') step(-1);
+  else if (k === ' ') { e.preventDefault(); toggleOpen(); }
+  else if (k === 'r') toggleShow();
+  else if (k === 'q') toggleQR();
+  else if (k === 'b') document.body.classList.toggle('bar-off');
+  else if (k === 'escape') toggleQR(false);
+});
+
+/* ── 그리기 ── */
+function render(){
+  const i = curIndex();
+  $('#pos').textContent = questions.length ? `질문 ${i < 0 ? '-' : i + 1} / ${questions.length}` : '';
+  if (!state || !state.qid){
+    $('#qText').textContent = questions.length ? '◀ ▶ 버튼으로 질문을 띄워 주세요' : '아래 [질문 편집]에서 첫 질문을 만들어 보세요';
+  } else $('#qText').textContent = state.text || '';
+  const open = !!(state && state.open);
+  const chip = $('#chip');
+  chip.className = 'chip' + (open ? ' open' : '');
+  chip.textContent = !state || !state.qid ? '대기' : open ? '투표 중' : (responses.length ? '마감' : '시작 전');
+  const ob = $('#openBtn');
+  ob.textContent = open ? '투표 마감' : '투표 시작';
+  ob.className = open ? 'stop' : 'go';
+  $('#showBtn').textContent = showResults ? '결과 숨기기' : '결과 보이기';
+  renderResults();
+}
+
+function renderResults(){
+  const box = $('#results');
+  const voters = new Set(responses.map(r => r.voter)).size;
+  $('#voters').textContent = voters;
+  if (!state || !state.qid){ box.innerHTML = ''; box.dataset.sig = ''; return; }
+  if (state.kind === 'word') return renderCloud(box);
+  renderBars(box);
+}
+
+function renderBars(box){
+  const opts = state.options || [];
+  const sig = 'bars:' + JSON.stringify(opts);
+  if (box.dataset.sig !== sig){
+    box.dataset.sig = sig; box.innerHTML = '';
+    const wrap = document.createElement('div'); wrap.className = 'bars';
+    opts.forEach((o) => {
+      const row = document.createElement('div'); row.className = 'row';
+      row.innerHTML = '<div class="label"></div><div class="track"><div class="fill"></div></div><div class="val"></div>';
+      row.querySelector('.label').textContent = o;
+      wrap.appendChild(row);
+    });
+    const note = document.createElement('p'); note.className = 'hidden-note';
+    box.append(wrap, note);
+  }
+  const counts = opts.map(() => 0);
+  responses.forEach(r => { if (r.kind === 'choice' && counts[r.choice] !== undefined) counts[r.choice]++; });
+  const total = counts.reduce((a, b) => a + b, 0);
+  const max = Math.max(0, ...counts);
+  box.querySelectorAll('.row').forEach((row, i) => {
+    const c = counts[i], pct = total ? Math.round(c / total * 100) : 0;
+    row.classList.toggle('lead', showResults && c > 0 && c === max);
+    row.querySelector('.fill').style.width = showResults ? pct + '%' : '0%';
+    row.querySelector('.val').innerHTML = showResults ? `${c}<small>${pct}%</small>` : '<small>?</small>';
+  });
+  box.querySelector('.hidden-note').textContent =
+    showResults ? (total ? '' : '아직 응답이 없어요. QR을 찍고 들어와 주세요.') : `응답 ${total}개가 모였어요. 결과는 잠시 후 공개해요.`;
+}
+
+const PALETTE = ['#234F3C', '#7A4E25', '#C98A22', '#2F6650', '#5A3A1C'];
+function hash(s){ let h = 2166136261; for (const ch of s){ h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+
+function renderCloud(box){
+  box.dataset.sig = 'cloud';
+  const counts = new Map();
+  responses.forEach(r => { if (r.kind === 'word'){ const w = S.normWord(r.word); if (w) counts.set(w, (counts.get(w) || 0) + 1); } });
+  const total = [...counts.values()].reduce((a, b) => a + b, 0);
+  box.innerHTML = '';
+  if (!showResults){
+    box.innerHTML = `<p class="empty">단어 ${total}개가 모였어요. 결과는 잠시 후 공개해요.</p>`; return;
+  }
+  if (!counts.size){ box.innerHTML = '<p class="empty">아직 들어온 단어가 없어요. QR을 찍고 단어를 보내 주세요.</p>'; return; }
+  const max = Math.max(...counts.values());
+  const words = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60)
+    .sort((a, b) => hash(a[0]) - hash(b[0]));               // 새 단어가 와도 자리가 크게 흔들리지 않게
+  const cloud = document.createElement('div'); cloud.className = 'cloud';
+  words.forEach(([w, c]) => {
+    const s = document.createElement('span'); s.className = 'w';
+    const size = 22 + Math.sqrt(c / max) * 66;
+    s.style.fontSize = size + 'px';
+    s.style.color = PALETTE[hash(w) % PALETTE.length];
+    s.textContent = w; s.title = `${w} · ${c}`;
+    if (!seenWords.has(w)){ s.classList.add('new'); seenWords.add(w); }
+    if (c > 1){ const n = document.createElement('sup'); n.textContent = ' ' + c; n.style.cssText = 'font-size:.42em;opacity:.6'; s.appendChild(n); }
+    cloud.appendChild(s);
+  });
+  box.appendChild(cloud);
+}
+
+/* ── QR ── */
+function studentUrl(){
+  return localStorage.getItem('girinvote_url') || window.STUDENT_URL || location.href.replace(/screen\.html.*$/, 'index.html');
+}
+function drawQR(){
+  const url = studentUrl();
+  $('#urlText').textContent = url.replace(/^https?:\/\//, '');
+  $('#urlBig').textContent = url.replace(/^https?:\/\//, '');
+  if (!window.QRCode){ $('#qrSmall').textContent = 'QR 도구를 불러오지 못했어요 (인터넷 확인)'; return; }
+  [['#qrSmall', 190], ['#qrBig', Math.min(innerWidth, innerHeight) * 0.6]].forEach(([sel, size]) => {
+    const el = $(sel); el.innerHTML = '';
+    new QRCode(el, { text:url, width:size, height:size, colorDark:'#1D2722', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
+  });
+}
+function toggleQR(force){ $('#overlay').classList.toggle('on', force); }
+$('#urlEdit').onclick = () => {
+  const v = prompt('학생 투표 페이지 주소를 입력하세요 (비우면 config.js 주소 사용)', studentUrl());
+  if (v === null) return;
+  v.trim() ? localStorage.setItem('girinvote_url', v.trim()) : localStorage.removeItem('girinvote_url');
+  drawQR();
+};
+drawQR();
+addEventListener('resize', () => { clearTimeout(window._qrT); window._qrT = setTimeout(drawQR, 300); });
+
+/* ── 질문 편집 ── */
+let draft = [];
+const SAMPLES = [
+  { kind:'choice', text:'집단 활동 중 한 아이가 친구 말을 자꾸 끊고 자기 이야기만 해요. 먼저 해 볼 방법은?',
+    options:['규칙을 다시 짚어 준다', '말하기 차례 물건(토킹 스틱)을 쓴다', '활동 뒤 따로 이야기한다', '다른 아이에게 차례를 넘긴다'] },
+  { kind:'word', text:'"대화를 잘하는 아이" 하면 떠오르는 단어를 적어 주세요', options:[] },
+  { kind:'choice', text:'오늘 특강에서 가장 궁금한 주제는?',
+    options:['차례 주고받기', '주제 유지하기', '마음과 의도 읽기', '상황에 맞는 말투'] }
+];
+
+function openEditor(){
+  draft = questions.map(q => ({ ...q, options:[...(q.options || [])], optText:(q.options || []).join('\n') }));
+  renderEditor(); $('#editor').showModal();
+}
+function addDraft(kind, text = '', options = []){
+  draft.push({ id:S.newId('q'), kind, text, options, optText:options.join('\n'), round:0 });
+  renderEditor();
+  const list = $('#edList'); list.scrollTop = list.scrollHeight;
+}
+function renderEditor(){
+  const list = $('#edList'); list.innerHTML = '';
+  if (!draft.length){ list.innerHTML = '<p class="ed-empty">아직 질문이 없어요. 아래 버튼으로 질문을 추가해 보세요.</p>'; return; }
+  draft.forEach((q, i) => {
+    const it = document.createElement('div'); it.className = 'item'; it.dataset.i = i;
+    it.innerHTML = `
+      <div class="item-top">
+        <span class="n">${i + 1}</span>
+        <select aria-label="질문 형식"><option value="choice">객관식</option><option value="word">단어 응답</option></select>
+        <button class="mini up" aria-label="위로">▲</button><button class="mini down" aria-label="아래로">▼</button>
+        <button class="mini del">삭제</button>
+      </div>
+      <textarea class="t" rows="2" placeholder="질문을 입력하세요" aria-label="질문"></textarea>
+      <textarea class="o" rows="4" placeholder="보기를 한 줄에 하나씩 적어 주세요" aria-label="보기"></textarea>
+      <p class="hint">${q.kind === 'choice' ? '보기는 한 줄에 하나씩, 2~8개' : '참여자 한 명이 12자 이내 단어를 3개까지 보낼 수 있어요'}</p>
+      <p class="warn" hidden></p>`;
+    const sel = it.querySelector('select'), t = it.querySelector('.t'), o = it.querySelector('.o');
+    sel.value = q.kind; t.value = q.text; o.value = q.optText || '';
+    o.hidden = q.kind !== 'choice';
+    sel.onchange = () => { q.kind = sel.value; renderEditor(); };
+    t.oninput = () => { q.text = t.value; };
+    o.oninput = () => { q.optText = o.value; };
+    it.querySelector('.up').onclick = () => { if (i > 0){ [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; renderEditor(); } };
+    it.querySelector('.down').onclick = () => { if (i < draft.length - 1){ [draft[i + 1], draft[i]] = [draft[i], draft[i + 1]]; renderEditor(); } };
+    it.querySelector('.del').onclick = () => { if (confirm(`${i + 1}번 질문을 삭제할까요?`)){ draft.splice(i, 1); renderEditor(); } };
+    list.appendChild(it);
+  });
+}
+$('#edAddChoice').onclick = () => addDraft('choice');
+$('#edAddWord').onclick = () => addDraft('word');
+$('#edSample').onclick = () => SAMPLES.forEach(s => addDraft(s.kind, s.text, s.options));
+$('#edCancel').onclick = () => $('#editor').close();
+$('#edSave').onclick = async () => {
+  let ok = true;
+  document.querySelectorAll('#edList .item').forEach((it, i) => {
+    const q = draft[i];
+    q.text = q.text.trim();
+    q.options = q.kind === 'choice' ? (q.optText || '').split('\n').map(s => s.trim()).filter(Boolean).slice(0, 8) : [];
+    let msg = '';
+    if (!q.text) msg = '질문을 입력해 주세요.';
+    else if (q.kind === 'choice' && q.options.length < 2) msg = '보기를 2개 이상 적어 주세요.';
+    it.classList.toggle('bad', !!msg);
+    const w = it.querySelector('.warn'); w.textContent = msg; w.hidden = !msg;
+    if (msg) ok = false;
+  });
+  if (!ok) return;
+  try {
+    const keep = new Set(draft.map(q => q.id));
+    await Promise.all([
+      ...draft.map((q, i) => S.saveQuestion({ id:q.id, kind:q.kind, text:q.text, options:q.options, round:q.round || 0, order:i })),
+      ...questions.filter(q => !keep.has(q.id)).map(q => S.deleteQuestion(q.id))
+    ]);
+    const cur = state && draft.find(q => q.id === state.qid);
+    if (cur) await S.setState({ kind:cur.kind, text:cur.text, options:cur.options });
+    else if (draft.length) await S.setState({ qid:draft[0].id, kind:draft[0].kind, text:draft[0].text, options:draft[0].options, round:draft[0].round || 0, open:false });
+    else await S.setState({ qid:null, open:false });
+    $('#editor').close();
+  } catch (e){ onErr(e); }
+};
+</script>
+</body>
+</html>

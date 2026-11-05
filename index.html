@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>실시간 투표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --leaf:#234F3C; --paper:#F3F6EF; --mist:#DDE7DA; --ochre:#E3A33A; --spot:#7A4E25;
+  --ink:#1D2722; --muted:#5E6B63; --alert:#B5482F;
+  --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:var(--paper);color:var(--ink);font-family:var(--font);
+  padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+button,input{font:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid var(--ochre);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;padding:18px 20px 40px}
+.brand{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--leaf)}
+.brand .g{font-size:18px}
+.demo{background:var(--ochre);color:var(--ink);padding:2px 8px;border-radius:99px;font-size:12px;margin-left:auto}
+.q{font-size:24px;line-height:1.4;font-weight:700;margin:22px 0 8px;word-break:keep-all}
+.status{font-size:15px;color:var(--muted);margin:0 0 20px}
+.status.open{color:var(--leaf);font-weight:600}
+.opts{display:flex;flex-direction:column;gap:12px}
+.opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:16px 16px;border-radius:14px;border:2px solid var(--mist);
+  background:#fff;color:var(--ink);font-size:18px;font-weight:600;line-height:1.35;word-break:keep-all;cursor:pointer;transition:border-color .15s,background .15s}
+.opt .dot{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--mist);background:#fff}
+.opt.on{border-color:var(--leaf);background:#fff7e8}
+.opt.on .dot{border-color:var(--spot);background:var(--ochre);
+  background-image:radial-gradient(circle at 35% 35%, var(--spot) 22%, transparent 26%),radial-gradient(circle at 68% 66%, var(--spot) 18%, transparent 22%)}
+.opt:disabled{cursor:default;opacity:.55}
+.opt.on:disabled{opacity:1}
+.send{display:flex;gap:8px}
+.send input{flex:1;min-width:0;font-size:18px;padding:14px;border-radius:12px;border:2px solid var(--mist);background:#fff;color:var(--ink)}
+.send button,.primary{flex:none;padding:0 20px;border-radius:12px;border:0;background:var(--leaf);color:var(--paper);font-size:17px;font-weight:700;cursor:pointer;min-height:52px}
+.send button:disabled{opacity:.5}
+.mine{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.mine span{background:var(--leaf);color:var(--paper);padding:6px 12px;border-radius:99px;font-size:15px;font-weight:600}
+.small{font-size:14px;color:var(--muted);margin:10px 0 0}
+.wait{margin-top:60px;text-align:center;color:var(--muted);font-size:17px;line-height:1.6}
+.wait .g{font-size:54px;display:block;margin-bottom:10px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;
+  background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:12px;font-size:15px;max-width:90vw;text-align:center;transition:.25s;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.bad{background:var(--alert)}
+.foot{margin-top:40px;font-size:12px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="brand"><span class="g" aria-hidden="true">🦒</span>꿈부자기린쌤 실시간 투표<span class="demo" id="demo" hidden>연습 모드</span></div>
+  <div id="app"><div class="wait"><span class="g" aria-hidden="true">🦒</span>연결하는 중이에요…</div></div>
+  <p class="foot">응답은 이름 없이 모여요</p>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script src="vote-core.js"></script>
+<script>
+const S = window.VoteStore;
+const app = document.getElementById('app');
+if (!S.live) document.getElementById('demo').hidden = false;
+
+let state = null, got = false, lastSig = '';
+const MINE_KEY = 'girinvote_mine';
+const loadMine = () => { try { return JSON.parse(S.local.getItem(MINE_KEY)) || {}; } catch (e){ return {}; } };
+const saveMine = (m) => S.local.setItem(MINE_KEY, JSON.stringify(m));
+
+let toastT;
+function toast(msg, bad){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast on' + (bad ? ' bad' : '');
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast', 2600);
+}
+const FAIL = '보내지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.';
+
+S.onState(st => { state = st; got = true; render(); }, () => {
+  app.innerHTML = '<div class="wait"><span class="g" aria-hidden="true">🦒</span>연결이 끊겼어요.<br>와이파이나 데이터를 확인하고 새로고침해 주세요.</div>';
+  lastSig = '';
+});
+setTimeout(() => {
+  if (!got) app.innerHTML = '<div class="wait"><span class="g" aria-hidden="true">🦒</span>연결이 늦어지고 있어요.<br>와이파이나 데이터를 확인하고 새로고침해 주세요.</div>';
+}, 10000);
+
+function render(){
+  const key = S.qkey(state);
+  const mine = (loadMine()[key]) || {};
+  const sig = JSON.stringify([key, state && state.open, state && state.text, state && state.options, state && state.kind, mine]);
+  if (sig === lastSig) return;          // 입력 중인 글자가 지워지지 않게
+  lastSig = sig;
+
+  if (!key){
+    app.innerHTML = '<div class="wait"><span class="g" aria-hidden="true">🦒</span>강의 화면에 질문이 뜨면<br>여기에도 바로 나타나요.</div>';
+    return;
+  }
+  const open = !!state.open;
+  app.innerHTML = '';
+  const h = document.createElement('h1'); h.className = 'q'; h.textContent = state.text || '';
+  const st = document.createElement('p'); st.className = 'status' + (open ? ' open' : '');
+  app.append(h, st);
+
+  if (state.kind === 'word'){
+    const words = mine.words || [];
+    st.textContent = open ? (words.length >= 3 ? '단어 3개를 모두 보냈어요. 고마워요!' : `단어를 보내 주세요 (${words.length}/3)`)
+                          : '지금은 응답을 받지 않아요. 강사님 안내를 기다려 주세요.';
+    if (open && words.length < 3){
+      const f = document.createElement('form'); f.className = 'send';
+      f.innerHTML = '<input maxlength="12" placeholder="12자 이내 단어" aria-label="단어 입력" autocomplete="off" enterkeyhint="send"><button>보내기</button>';
+      const inp = f.querySelector('input'), btn = f.querySelector('button');
+      f.onsubmit = (e) => {
+        e.preventDefault();
+        const w = S.normWord(inp.value);
+        if (!w){ inp.focus(); return; }
+        btn.disabled = true;
+        const n = words.length;
+        S.setResponse(`${key}__${S.voterId}__w${n}`, { qkey:key, voter:S.voterId, kind:'word', word:w, ts:Date.now() })
+          .then(() => {
+            const m = loadMine(); m[key] = { words:[...words, w] }; saveMine(m);
+            toast(`"${w}" 보냈어요`); render();
+            const next = app.querySelector('input'); if (next) next.focus();
+          })
+          .catch(() => { btn.disabled = false; toast(FAIL, true); });
+      };
+      app.appendChild(f);
+    }
+    if (words.length){
+      const box = document.createElement('div'); box.className = 'mine';
+      words.forEach(w => { const s = document.createElement('span'); s.textContent = w; box.appendChild(s); });
+      const p = document.createElement('p'); p.className = 'small'; p.textContent = '내가 보낸 단어';
+      app.append(p, box);
+    }
+    return;
+  }
+
+  // 객관식
+  const picked = mine.choice;
+  st.textContent = open ? (picked === undefined ? '하나를 골라 주세요' : '선택했어요. 마감 전까지 바꿀 수 있어요.')
+                        : '지금은 응답을 받지 않아요. 강사님 안내를 기다려 주세요.';
+  const list = document.createElement('div'); list.className = 'opts';
+  (state.options || []).forEach((o, i) => {
+    const b = document.createElement('button');
+    b.className = 'opt' + (picked === i ? ' on' : '');
+    b.disabled = !open;
+    b.setAttribute('aria-pressed', picked === i);
+    b.innerHTML = '<span class="dot" aria-hidden="true"></span><span></span>';
+    b.lastChild.textContent = o;
+    b.onclick = () => {
+      if (picked === i) return;
+      list.querySelectorAll('.opt').forEach(x => x.classList.remove('on')); b.classList.add('on');
+      S.setResponse(`${key}__${S.voterId}`, { qkey:key, voter:S.voterId, kind:'choice', choice:i, ts:Date.now() })
+        .then(() => { const m = loadMine(); m[key] = { choice:i }; saveMine(m); toast('선택했어요'); render(); })
+        .catch(() => { b.classList.remove('on'); toast(FAIL, true); lastSig = ''; render(); });
+    };
+    list.appendChild(b);
+  });
+  app.appendChild(list);
+}
+</script>
+</body>
+</html>
