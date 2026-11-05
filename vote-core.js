@@ -31,6 +31,18 @@
     Store.deleteQuestion = (id) => db.doc('questions/' + id).delete();
     Store.onResponses = (qkey, cb, err) => db.collection('responses').where('qkey', '==', qkey).onSnapshot(s => cb(s.docs.map(d => Object.assign({}, d.data(), { _id: d.id }))), err);
     Store.setResponse = (id, data) => db.doc('responses/' + id).set(data);
+
+    // 강사 로그인 (firebase-auth-compat를 불러온 화면에서만 동작 — 학생 화면은 로그인 없음)
+    const auth = firebase.auth ? firebase.auth() : null;
+    const toUser = (u) => (u ? { email: u.email || '', verified: !!u.emailVerified } : null);
+    Store.onAuth = (cb) => (auth ? auth.onAuthStateChanged(u => cb(toUser(u))) : (setTimeout(() => cb(null), 0), () => {}));
+    Store.signIn = () => {
+      if (!auth) return Promise.reject(new Error('auth-not-loaded'));
+      const p = new firebase.auth.GoogleAuthProvider();
+      p.setCustomParameters({ prompt: 'select_account' });
+      return auth.signInWithPopup(p);
+    };
+    Store.signOut = () => (auth ? auth.signOut() : Promise.resolve());
   } else {
     const K = 'girinvote_demo';
     const empty = () => ({ state: null, questions: {}, responses: {} });
@@ -49,6 +61,11 @@
     Store.onResponses = (qkey, cb) => sub(d => cb(Object.entries(d.responses).filter(([, r]) => r.qkey === qkey).map(([id, r]) => Object.assign({}, r, { _id: id }))));
     Store.setResponse = (id, data) => mutate(d => { d.responses[id] = data; });
     Store.clearDemo = () => { localStorage.removeItem(K); fire(); };
+
+    // 연습 모드: 로그인 없이 바로 통과
+    Store.onAuth = (cb) => { setTimeout(() => cb({ email: window.ADMIN_EMAIL || '', verified: true, demo: true }), 0); return () => {}; };
+    Store.signIn = () => Promise.resolve();
+    Store.signOut = () => Promise.resolve();
   }
 
   window.VoteStore = Store;

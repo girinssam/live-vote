@@ -17,3 +17,7 @@ window.FIREBASE_CONFIG = {
 // 2) 학생 투표 페이지 주소 — GitHub Pages에 올린 뒤 채우세요. 이 주소로 QR이 만들어져요.
 //    예: "https://girinssam.github.io/live-vote/"
 window.STUDENT_URL = "https://girinssam.github.io/live-vote/";
+
+// 3) 강사 계정 — 강사 화면(screen.html)은 이 구글 계정으로 로그인해야 쓸 수 있어요.
+//    Firestore 보안 규칙(firestore.rules)에도 같은 주소가 들어 있어요. 바꿀 때는 두 곳을 함께 바꾸세요.
+window.ADMIN_EMAIL = "girinssam@gmail.com";

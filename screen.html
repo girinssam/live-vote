@@ -166,6 +166,18 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-vis
 .bar button.stop{background:var(--paper);color:var(--leaf);border-color:var(--paper)}
 .bar .sep{width:1px;height:26px;background:rgba(255,247,214,.25);margin:0 6px}
 .bar .keys{margin-left:auto;font-size:13px;opacity:.7}
+.bar #logoutBtn{font-size:13px;padding:5px 10px}
+.bar #logoutBtn[hidden]{display:none}
+
+/* 강사 로그인 잠금 */
+.lock{position:fixed;inset:0;z-index:50;background:var(--paper);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
+.lock[hidden]{display:none}
+.lock img{width:120px;height:120px}
+.lock h2{margin:0;font-size:clamp(26px,3vw,38px)}
+.lock p{margin:0;font-size:18px;color:var(--muted);max-width:32em}
+.lock p:empty{display:none}
+.lock button{border:0;border-radius:12px;padding:14px 26px;font-size:18px;font-weight:700;background:var(--strong);color:var(--ink)}
+.lock button[hidden]{display:none}
 body.bar-off .bar{display:none}
 
 /* QR 크게 */
@@ -262,6 +274,13 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
 <body>
 <div class="err" id="err" role="alert"></div>
 
+<div class="lock" id="lock" role="dialog" aria-label="강사 로그인">
+  <img src="girin.png" alt="" aria-hidden="true">
+  <h2 id="lockTitle">강사 화면이에요</h2>
+  <p id="lockMsg"></p>
+  <button id="loginBtn" hidden>구글 계정으로 로그인</button>
+</div>
+
 <header class="top">
   <div class="brand"><img class="g" src="girin.png" alt="" aria-hidden="true">꿈부자기린쌤 실시간 소통창<span id="demoBadge" class="demo" hidden>연습 모드</span></div>
   <div class="pos" id="pos"></div>
@@ -298,6 +317,7 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
   <button id="qrBtn">QR 크게</button>
   <button id="editBtn">질문 편집</button>
   <span class="keys">←→ 질문 · Space 시작/마감 · R 결과 · Q QR · B 조작 막대</span>
+  <button id="logoutBtn" hidden>로그아웃</button>
 </nav>
 
 <div class="overlay" id="overlay" role="dialog" aria-label="접속 QR">
@@ -326,6 +346,7 @@ dialog::backdrop{background:rgba(46,58,70,.35)}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="config.js"></script>
 <script src="vote-core.js"></script>
@@ -342,13 +363,62 @@ if (!S.live) $('#demoBadge').hidden = false;
 let errTimer;
 function onErr(e){
   const el = $('#err');
-  el.textContent = '연결 오류: ' + (e && e.message ? e.message : e) + ' — 인터넷 연결, config.js, Firebase 보안 규칙을 확인해 주세요.';
+  el.textContent = (e && e.code === 'permission-denied')
+    ? '로그인이 풀렸어요. 다시 로그인해 주세요'
+    : '연결 오류: ' + (e && e.message ? e.message : e) + ' — 인터넷 연결, config.js, Firebase 보안 규칙을 확인해 주세요.';
   el.style.display = 'block'; clearTimeout(errTimer); errTimer = setTimeout(() => el.style.display = 'none', 9000);
 }
 
 /* ── 구독 ── */
-S.onQuestions(qs => { questions = qs; qLoaded = true; maybeAutoStart(); render(); }, onErr);
-S.onState(st => { state = st; stateLoaded = true; watchResponses(); maybeAutoStart(); render(); }, onErr);
+// 질문·상태 구독과 자동 시작은 강사 로그인이 확인된 뒤에 시작
+let synced = false;
+function startSync(){
+  if (synced) return;
+  synced = true;
+  S.onQuestions(qs => { questions = qs; qLoaded = true; maybeAutoStart(); render(); }, onErr);
+  S.onState(st => { state = st; stateLoaded = true; watchResponses(); maybeAutoStart(); render(); }, onErr);
+}
+
+/* ── 강사 로그인 ── */
+let locked = true, wrongAccount = false;
+const isAdmin = (u) => !!(u && u.email && u.verified && window.ADMIN_EMAIL
+  && u.email.toLowerCase() === String(window.ADMIN_EMAIL).toLowerCase());
+function showLock(title, msg, btn){
+  locked = true;
+  $('#lockTitle').textContent = title; $('#lockMsg').textContent = msg || '';
+  $('#loginBtn').textContent = btn; $('#loginBtn').hidden = false; $('#loginBtn').disabled = false;
+  $('#lock').hidden = false;
+}
+S.onAuth(u => {
+  if (u && (u.demo || isAdmin(u))){
+    locked = false; wrongAccount = false;
+    $('#lock').hidden = true;
+    $('#logoutBtn').hidden = !!u.demo;
+    startSync();
+  } else if (u){
+    wrongAccount = true;
+    $('#logoutBtn').hidden = true;
+    showLock('강사 계정이 아니에요', u.email, '다른 계정으로 로그인');
+  } else {
+    wrongAccount = false;
+    $('#logoutBtn').hidden = true;
+    showLock('강사 화면이에요', location.protocol === 'file:' ? '강사 화면은 GitHub Pages 주소로 열어 주세요' : '', '구글 계정으로 로그인');
+  }
+});
+$('#loginBtn').onclick = async () => {
+  $('#loginBtn').disabled = true; $('#lockMsg').textContent = '';
+  try {
+    if (wrongAccount) await S.signOut();
+    await S.signIn();
+  } catch (e){
+    const code = (e && e.code) || '';
+    if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request')
+      $('#lockMsg').textContent = code === 'auth/unauthorized-domain' ? '이 주소에서는 로그인할 수 없어요 (Firebase 승인된 도메인 확인)'
+        : code === 'auth/popup-blocked' ? '로그인 창이 막혔어요. 브라우저의 팝업 허용을 확인해 주세요'
+        : '로그인하지 못했어요 (' + (code || (e && e.message) || e) + ')';
+  } finally { $('#loginBtn').disabled = false; }
+};
+$('#logoutBtn').onclick = () => { closeMemo(); if ($('#editor').open) $('#editor').close(); S.signOut().catch(onErr); };
 
 function maybeAutoStart(){
   // 처음 열었을 때 띄운 질문이 없으면 첫 질문을 띄움
@@ -396,7 +466,7 @@ $('#overlay').onclick = () => toggleQR(false);
 $('#editBtn').onclick = openEditor;
 
 document.addEventListener('keydown', (e) => {
-  if ($('#editor').open || $('#memoView').open || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (locked || $('#editor').open || $('#memoView').open || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   const k = e.key.toLowerCase();
   if (k === 'arrowright') step(1);
   else if (k === 'arrowleft') step(-1);
