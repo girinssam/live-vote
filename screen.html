@@ -71,14 +71,18 @@
 }
 
 :root{
-  --leaf:#7A5530;      /* 진한 갈색: 조작 막대·강조 */
-  --leaf-2:#8C6639;
-  --paper:#FFF7D6;     /* 파스텔 노랑 배경 */
-  --mist:#F3E3A0;      /* 연한 버터색: 칩·테두리 */
-  --ochre:#F4C74F;     /* 기린 털(막대) */
-  --spot:#A0703A;      /* 기린 무늬 */
-  --ink:#3B2E1E;
-  --muted:#7D6B4F;
+  --paper:#F4F9FE;    /* 바탕: 연한 하늘 */
+  --surface:#FFFFFF;  /* 카드·빈 막대·조작 막대 */
+  --mist:#DCEAF7;     /* 테두리·칩 */
+  --ochre:#FFE58A;    /* 막대: 레몬 */
+  --lead:#FFD54A;     /* 가장 많이 나온 막대 */
+  --strong:#A9D3F5;   /* 버튼·선택 표시: 하늘 */
+  --soft:#EAF4FD;     /* 선택한 보기 배경 */
+  --leaf:#2F6EA5;     /* 강조 글자 */
+  --leaf-2:#EAF4FD;
+  --spot:#2F6EA5;     /* 1등 보기 글자 */
+  --ink:#2E3A46;      /* 본문 글자 */
+  --muted:#6B7A88;
   --alert:#B5482F;
   --font:'Paperozi','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
 }
@@ -192,6 +196,23 @@ dialog::backdrop{background:rgba(59,46,30,.55)}
   .top{padding:14px 20px 0}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* 하늘레몬 색 */
+.track{background:var(--surface)}
+.row.lead .fill{background-color:var(--lead)}
+.chip{background:var(--mist);color:var(--ink)}
+.chip.open{background:var(--strong);color:var(--ink)}
+.chip.open::before{background:var(--ink)}
+.bar{background:var(--surface);color:var(--ink);border-top:1.5px solid var(--mist)}
+.bar button{color:var(--ink);border-color:var(--mist)}
+.bar button:hover{background:var(--paper)}
+.bar button.go{background:var(--strong);border-color:var(--strong);color:var(--ink)}
+.bar button.stop{background:var(--lead);border-color:var(--lead);color:var(--ink)}
+.bar .sep{background:var(--mist)}
+.qrbox{border-color:var(--mist)}
+.btn{border-color:var(--strong);color:var(--ink)}
+.btn.primary{background:var(--strong);color:var(--ink)}
+dialog::backdrop{background:rgba(46,58,70,.35)}
 </style>
 </head>
 <body>
@@ -400,7 +421,7 @@ function renderBars(box){
     showResults ? (total ? '' : '아직 응답이 없어요. QR을 찍고 들어와 주세요.') : `응답 ${total}개가 모였어요. 결과는 잠시 후 공개해요.`;
 }
 
-const PALETTE = ['#7A5530', '#9A6A2F', '#5E4326', '#B0782A', '#8C5A3C'];
+const PALETTE = ['#2F6EA5', '#B98500', '#4C86BF', '#8A6A00', '#3E5F7E'];
 function hash(s){ let h = 2166136261; for (const ch of s){ h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 
 function renderCloud(box){
@@ -441,7 +462,7 @@ function drawQR(){
   if (!window.QRCode){ $('#qrSmall').textContent = 'QR 도구를 불러오지 못했어요 (인터넷 확인)'; return; }
   [['#qrSmall', 190], ['#qrBig', Math.min(innerWidth, innerHeight) * 0.6]].forEach(([sel, size]) => {
     const el = $(sel); el.innerHTML = '';
-    new QRCode(el, { text:url, width:size, height:size, colorDark:'#3B2E1E', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
+    new QRCode(el, { text:url, width:size, height:size, colorDark:'#2E3A46', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
   });
 }
 function toggleQR(force){ $('#overlay').classList.toggle('on', force); }
