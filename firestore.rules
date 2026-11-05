@@ -34,8 +34,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // 질문 목록과 현재 화면 상태 (강사 화면이 씀)
-    match /questions/{id} { allow read, write: if true; }
-    match /state/{id}     { allow read, write: if true; }
+    // 질문 목록과 현재 화면 상태: 읽기는 누구나, 쓰기는 강사 계정(구글 로그인)만
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'girinssam@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    match /questions/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /state/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }
